@@ -1,0 +1,38 @@
+{
+  "name": "intuition-contracts-v2",
+  "description": "Intuition Contracts V2",
+  "version": "1.0.0",
+  "author": {
+    "name": "0xIntuition",
+    "url": "https://github.com/0xIntuition/intuition-contracts-v2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6",
+    "@openzeppelin/contracts-upgradeable": "^4.9.6"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0",
+    "ethers": "^5.8.0",
+    "prettier": "^3.5",
+    "solhint": "^5.1"
+  },
+  "keywords": [
+    "intuition",
+    "ethereum"
+  ],
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf cache out",
+    "build": "forge build",
+    "fmt": "forge fmt",
+    "fmt:check": "forge fmt --check",
+    "lint": "bun run lint:sol && bun run prettier:check",
+    "lint:sol": "forge fmt --check && bun solhint \"{script,src,tests}/**/*.sol\"",
+    "prettier:check": "prettier --check \"**/*.{json,md,yml}\"",
+    "prettier:write": "prettier --write \"**/*.{json,md,yml}\"",
+    "test": "forge test",
+    "coverage": "forge coverage --no-match-coverage '(script|tests|src/external)'",
+    "test:coverage": "forge coverage",
+    "test:coverage:report": "forge coverage --no-match-coverage '(script|tests|src/external)' --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent"
+  }
+}
