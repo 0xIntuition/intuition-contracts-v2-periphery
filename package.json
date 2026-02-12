@@ -1,6 +1,6 @@
 {
-  "name": "intuition-contracts-v2",
-  "description": "Intuition Contracts V2",
+  "name": "intuition-contracts-v2-periphery",
+  "description": "Intuition V2 Periphery Smart Contracts",
   "version": "1.0.0",
   "author": {
     "name": "0xIntuition",
