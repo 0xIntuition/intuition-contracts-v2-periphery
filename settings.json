@@ -8,6 +8,8 @@
     "solady/=lib/solady/src/",
     "@prb/math/=lib/prb-math/",
     "@account-abstraction/=lib/account-abstraction/contracts/",
-    "intuition-contracts-v2/=lib/intuition-contracts-v2/src/"
+    "intuition-contracts-v2/=lib/intuition-contracts-v2/src/",
+    "src/=lib/intuition-contracts-v2/src/",
+    "contracts/=contracts/"
   ]
 }
