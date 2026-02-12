@@ -11,7 +11,7 @@
   out = "out"
   script = "script"
   solc = "0.8.29"
-  src = "src"
+  src = "contracts"
   test = "tests"
   libs = ["node_modules", "lib"]
   extra_output = ["storageLayout", "metadata"]
@@ -27,7 +27,7 @@
     "@account-abstraction/=lib/account-abstraction/contracts/",
     "intuition-contracts-v2/=lib/intuition-contracts-v2/src/",
     "src/=lib/intuition-contracts-v2/src/",
-    "contracts/=src/"
+    "contracts/=contracts/"
   ]
 
 [profile.ci]
@@ -46,10 +46,10 @@
 [lint]
   exclude_lints = ["mixed-case-function", "asm-keccak256", "screaming-snake-case-immutable", "incorrect-shift", "mixed-case-variable"]
   ignore = [
-    "src/interfaces/**/*.sol",
+    "contracts/interfaces/**/*.sol",
     "tests/**/*.sol",
     "script/**/*.sol",
-    "src/external/**/*.sol",
+    "contracts/interfaces/external/**/*.sol",
     "lib/intuition-contracts-v2/src/**/*.sol"
   ]
 
