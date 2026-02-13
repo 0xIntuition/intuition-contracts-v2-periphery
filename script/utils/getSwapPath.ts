@@ -10,9 +10,9 @@
  *   bun script/utils/getSwapPath.ts <tokenInAddress> <amountInRawUnits>
  *
  * Examples:
- *   bun script/utils/getSwapPath.ts 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 10000000          # 10 USDC
- *   bun script/utils/getSwapPath.ts 0x4200000000000000000000000000000000000006 10000000000000000 # 0.01 ETH
- *   bun script/utils/getSwapPath.ts 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb 10000000          # 10 DAI
+ *   bun script/utils/getSwapPath.ts 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 10000000             # 10 USDC
+ *   bun script/utils/getSwapPath.ts 0x4200000000000000000000000000000000000006 10000000000000000    # 0.01 ETH
+ *   bun script/utils/getSwapPath.ts 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb 10000000000000000000 # 10 DAI
  *
  * Environment:
  *   Reads BASE_RPC_URL or falls back to Alchemy with API_KEY_ALCHEMY.
