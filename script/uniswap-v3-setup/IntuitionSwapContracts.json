@@ -1,0 +1,30 @@
+{
+    "mainnet": {
+        "v3CoreFactoryAddress":"0x8e7817632Ff76F70BA96C12E9D555DA78023F4fe",
+        "multicall2Address":"0x1E0988C341D773e8fc711B5ABe58123A14B5a8E7",
+        "proxyAdminAddress":"0x3B08874907146D144348d22Ea1936B6653836Ccc",
+        "tickLensAddress":"0x1C65f439e46E4263A810C3AACC8657cFAE8ef01f",
+        "nftDescriptorLibraryAddressV1_3_0":"0xE712F80336dD80Bd3D15B5391599198394Cc2107",
+        "nonfungibleTokenPositionDescriptorAddressV1_3_0":"0x265cd3509fbD90954B7D8304e91637CC950a0E25",
+        "descriptorProxyAddress":"0x891FFB123E2ef8023E0A3C2C5ed7193dA6cEC87c",
+        "nonfungibleTokenPositionManagerAddress":"0x07Da339184f4Fa0E7876aCcAebe5c9E72eF52a12",
+        "v3MigratorAddress":"0x2DE994675d834192FFb4AbB8d59f366c4eBe276f",
+        "v3StakerAddress":"0xE36C018abCcd3c9DD4Dfa3c795865E17A6Df6Dd5",
+        "quoterV2Address":"0x565bAA8495C7c570A3bbDA67ac9075eF577C56b4",
+        "swapRouter02":"0xaDfe2ddd6b92DA8D7996489a0d61bc2F687998e0"
+    },
+    "testnet": {
+      "v3CoreFactoryAddress": "0x3C1a5B48C1422D2260DC07b87Edb5a187a95bFe8",
+      "multicall2Address": "0x415C571f50ee9F748CeE1504fe4F82d1dE539D7C",
+      "proxyAdminAddress": "0x56b3405B8f71B9FDf165A4e33035A53f35d0f14D",
+      "tickLensAddress": "0x15C04afC8fD897F9cff70cBe1E769421989B6790",
+      "nftDescriptorLibraryAddressV1_3_0": "0xb378DD08a1827E2d95cdc06D7AE3C9268116aD24",
+      "nonfungibleTokenPositionDescriptorAddressV1_3_0": "0x416296d5ef14c1ED9Bb8e2443D2f9962C90F6344",
+      "descriptorProxyAddress": "0x279F8fD86DB14E8F36D78A6977935a20639191df",
+      "nonfungibleTokenPositionManagerAddress": "0xc6Ec0Ee7795b46A58D78Df323672c3d70bd9C524",
+      "v3MigratorAddress": "0x5d175E03068d853B306c78736800BE13F6DCb6eE",
+      "v3StakerAddress": "0xda52EE1E3eF9d5b688cf3d6d0d9eD2a2E6F3b7b4",
+      "quoterV2Address": "0x77548B0521e71Aafb2E3FCb62b2066bF999c7345",
+      "swapRouter02": "0x0334BBdE746c9f938ba903f22af5B02A58310C4A"
+    }
+}
