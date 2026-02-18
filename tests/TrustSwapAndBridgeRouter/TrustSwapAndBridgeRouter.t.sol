@@ -582,6 +582,22 @@ contract TrustSwapAndBridgeRouterTest is Test {
         trustSwapRouter.swapAndBridgeWithETH{ value: bridgeFee }(path, 1, user);
     }
 
+    function test_swapAndBridgeWithETH_revertsOnZeroRecipient() public {
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 totalEth = 1 ether + bridgeFee;
+
+        vm.deal(user, totalEth);
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipient.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 0, address(0));
+        vm.stopPrank();
+    }
+
     function test_swapAndBridgeWithETH_revertsOnZeroETH() public {
         bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
 
@@ -747,6 +763,21 @@ contract TrustSwapAndBridgeRouterTest is Test {
         trustSwapRouter.swapAndBridgeWithERC20{ value: totalETH }(BASE_MAINNET_USDC, amountIn, path, 0, user);
 
         assertEq(user.balance, userEthBefore - bridgeFee);
+    }
+
+    function test_swapAndBridgeWithERC20_revertsOnZeroRecipient() public {
+        uint256 amountIn = 100e6;
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipient.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 0, address(0));
+        vm.stopPrank();
     }
 
     function test_swapAndBridgeWithERC20_revertsOnZeroAmountIn() public {

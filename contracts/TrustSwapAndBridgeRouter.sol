@@ -156,6 +156,7 @@ contract TrustSwapAndBridgeRouter is
         nonReentrant
         returns (uint256 amountOut, bytes32 transferId)
     {
+        if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
         if (_extractFirstToken(path) != WETH_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH();
         }
@@ -208,6 +209,7 @@ contract TrustSwapAndBridgeRouter is
         returns (uint256 amountOut, bytes32 transferId)
     {
         if (amountIn == 0) revert TrustSwapAndBridgeRouter_AmountInZero();
+        if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
         if (tokenIn == address(0) || tokenIn == TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_InvalidToken();
         }

@@ -139,6 +139,9 @@ interface ITrustSwapAndBridgeRouter {
     /// @dev Thrown when the last token in the path is not TRUST
     error TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST();
 
+    /// @dev Thrown when recipient address is zero
+    error TrustSwapAndBridgeRouter_InvalidRecipient();
+
     /// @dev Thrown when a pool referenced in the path does not exist in the CL factory
     error TrustSwapAndBridgeRouter_PoolDoesNotExist();
 

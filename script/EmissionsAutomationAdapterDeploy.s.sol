@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
-import { Script, console2 } from "forge-std/src/Script.sol";
+import { console2 } from "forge-std/src/console2.sol";
+import { Script } from "forge-std/src/Script.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { EmissionsAutomationAdapter } from "contracts/EmissionsAutomationAdapter.sol";
 import { SetupScript } from "script/SetupScript.s.sol";
@@ -40,7 +42,16 @@ forge script script/base/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomat
 */
 
 contract EmissionsAutomationAdapterDeploy is SetupScript {
-    EmissionsAutomationAdapter public emissionsAutomationAdapterImpl;
+    /* =================================================== */
+    /*                   Config Constants                  */
+    /* =================================================== */
+
+    // ===== Upgrades TimelockController Address =====
+    address public constant UPGRADES_TIMELOCK_CONTROLLER = 0x1E442BbB08c98100b18fa830a88E8A57b5dF9157;
+
+    /// @dev Deployed contracts
+    EmissionsAutomationAdapter public emissionsAutomationAdapterImplementation;
+    TransparentUpgradeableProxy public emissionsAutomationAdapterProxy;
 
     /// @notice Address of the BaseEmissionsController contract
     address public BASE_EMISSIONS_CONTROLLER;
@@ -60,14 +71,34 @@ contract EmissionsAutomationAdapterDeploy is SetupScript {
     }
 
     function run() public broadcast {
-        _deploy();
         console2.log("");
         console2.log("DEPLOYMENTS: =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+");
-        console2.log("EmissionsAutomationAdapter:", address(emissionsAutomationAdapterImpl));
+
+        _deploy();
+
+        console2.log("");
+        console2.log("DEPLOYMENT COMPLETE: =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+");
+        contractInfo("EmissionsAutomationAdapter Implementation", address(emissionsAutomationAdapterImplementation));
+        contractInfo("EmissionsAutomationAdapter Proxy", address(emissionsAutomationAdapterProxy));
     }
 
+    /* =================================================== */
+    /*                   INTERNAL DEPLOY                   */
+    /* =================================================== */
+
     function _deploy() internal {
-        // 1. Deploy EmissionsAutomationAdapter contract
-        emissionsAutomationAdapterImpl = new EmissionsAutomationAdapter(ADMIN, BASE_EMISSIONS_CONTROLLER);
+        // Deploy EmissionsAutomationAdapter implementation
+        emissionsAutomationAdapterImplementation = new EmissionsAutomationAdapter();
+        info("EmissionsAutomationAdapter Implementation", address(emissionsAutomationAdapterImplementation));
+
+        // Prepare initialization data
+        bytes memory initData =
+            abi.encodeWithSelector(EmissionsAutomationAdapter.initialize.selector, ADMIN, BASE_EMISSIONS_CONTROLLER);
+
+        // Deploy EmissionsAutomationAdapter proxy
+        emissionsAutomationAdapterProxy = new TransparentUpgradeableProxy(
+            address(emissionsAutomationAdapterImplementation), UPGRADES_TIMELOCK_CONTROLLER, initData
+        );
+        info("EmissionsAutomationAdapter Proxy", address(emissionsAutomationAdapterProxy));
     }
 }
