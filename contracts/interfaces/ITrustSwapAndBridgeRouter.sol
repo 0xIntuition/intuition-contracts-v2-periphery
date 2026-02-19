@@ -61,6 +61,15 @@ interface ITrustSwapAndBridgeRouter {
     );
 
     /**
+     * @notice Emitted when TRUST is bridged directly without a swap
+     * @param user The address of the user bridging TRUST
+     * @param trustAmount The amount of TRUST bridged
+     * @param recipientAddress The recipient address on the destination chain
+     * @param transferId The unique cross-chain transfer ID from Metalayer
+     */
+    event TrustBridged(address indexed user, uint256 trustAmount, bytes32 recipientAddress, bytes32 transferId);
+
+    /**
      * @notice Emitted when the MetaERC20Hub address is updated
      * @param newMetaERC20Hub The new MetaERC20Hub address
      */
@@ -200,6 +209,15 @@ interface ITrustSwapAndBridgeRouter {
         external
         payable
         returns (uint256 amountOut, bytes32 transferId);
+
+    /**
+     * @notice Bridges TRUST directly to the destination chain without performing a swap
+     * @dev Caller must approve this contract to spend trustAmount TRUST. msg.value must cover bridge fee.
+     * @param trustAmount The amount of TRUST to bridge
+     * @param recipient Recipient address on the destination chain
+     * @return transferId Cross-chain transfer ID from Metalayer
+     */
+    function bridgeTrust(uint256 trustAmount, address recipient) external payable returns (bytes32 transferId);
 
     /**
      * @notice Quotes the bridge fee for transferring TRUST to the destination chain

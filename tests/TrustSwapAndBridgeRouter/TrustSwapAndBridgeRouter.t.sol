@@ -894,6 +894,107 @@ contract TrustSwapAndBridgeRouterTest is Test {
     }
 
     /* =================================================== */
+    /*                  BRIDGE TRUST TESTS                 */
+    /* =================================================== */
+
+    function test_bridgeTrust_successful() public {
+        uint256 trustAmount = 1000e18;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+
+        trustToken.mint(user, trustAmount);
+        vm.deal(user, bridgeFee);
+
+        uint256 userTrustBefore = trustToken.balanceOf(user);
+        uint256 routerTrustBefore = trustToken.balanceOf(address(trustSwapRouter));
+
+        vm.startPrank(user);
+        trustToken.approve(address(trustSwapRouter), trustAmount);
+        bytes32 transferId = trustSwapRouter.bridgeTrust{ value: bridgeFee }(trustAmount, alice);
+        vm.stopPrank();
+
+        assertTrue(transferId != bytes32(0));
+        assertEq(trustToken.balanceOf(user), userTrustBefore - trustAmount);
+        assertEq(trustToken.balanceOf(address(trustSwapRouter)), routerTrustBefore + trustAmount);
+    }
+
+    function test_bridgeTrust_emitsEvent() public {
+        uint256 trustAmount = 500e18;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+
+        trustToken.mint(user, trustAmount);
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+
+        trustToken.approve(address(trustSwapRouter), trustAmount);
+
+        vm.expectEmit(true, false, false, false);
+        emit ITrustSwapAndBridgeRouter.TrustBridged(user, trustAmount, bytes32(uint256(uint160(alice))), bytes32(0));
+
+        trustSwapRouter.bridgeTrust{ value: bridgeFee }(trustAmount, alice);
+        vm.stopPrank();
+    }
+
+    function test_bridgeTrust_refundsExcessETH() public {
+        uint256 trustAmount = 300e18;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 excessETH = 0.25 ether;
+        uint256 totalETH = bridgeFee + excessETH;
+
+        trustToken.mint(user, trustAmount);
+        vm.deal(user, totalETH);
+
+        uint256 userEthBefore = user.balance;
+
+        vm.startPrank(user);
+        trustToken.approve(address(trustSwapRouter), trustAmount);
+        trustSwapRouter.bridgeTrust{ value: totalETH }(trustAmount, alice);
+        vm.stopPrank();
+
+        assertEq(user.balance, userEthBefore - bridgeFee);
+    }
+
+    function test_bridgeTrust_revertsOnZeroAmount() public {
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_AmountInZero.selector)
+        );
+        trustSwapRouter.bridgeTrust(0, alice);
+    }
+
+    function test_bridgeTrust_revertsOnZeroRecipient() public {
+        uint256 trustAmount = 100e18;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+
+        trustToken.mint(user, trustAmount);
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+        trustToken.approve(address(trustSwapRouter), trustAmount);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipient.selector)
+        );
+        trustSwapRouter.bridgeTrust{ value: bridgeFee }(trustAmount, address(0));
+        vm.stopPrank();
+    }
+
+    function test_bridgeTrust_revertsOnInsufficientBridgeFee() public {
+        uint256 trustAmount = 100e18;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+
+        trustToken.mint(user, trustAmount);
+        vm.deal(user, bridgeFee - 1);
+
+        vm.startPrank(user);
+        trustToken.approve(address(trustSwapRouter), trustAmount);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InsufficientBridgeFee.selector)
+        );
+        trustSwapRouter.bridgeTrust{ value: bridgeFee - 1 }(trustAmount, alice);
+        vm.stopPrank();
+    }
+
+    /* =================================================== */
     /*                 QUOTE FUNCTION TESTS                */
     /* =================================================== */
 
