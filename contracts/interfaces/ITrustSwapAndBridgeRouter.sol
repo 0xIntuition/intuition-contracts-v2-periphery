@@ -11,7 +11,7 @@ import { FinalityState, IMetaERC20Hub } from "contracts/interfaces/external/meta
  * @author 0xIntuition
  * @notice Interface for the TrustSwapAndBridgeRouter contract which facilitates swapping any token for TRUST tokens
  *         on the Base network using pre-built Slipstream (CL) paths and bridging them to Intuition mainnet via
- * Metalayer.
+ *         Metalayer.
  */
 
 /// @notice Configuration struct for router initialization

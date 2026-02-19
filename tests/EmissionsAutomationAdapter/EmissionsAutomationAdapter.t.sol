@@ -33,6 +33,7 @@ contract EmissionsAutomationAdapterTest is Test {
     /* =================================================== */
 
     event BaseEmissionsControllerSet(address indexed newBaseEmissionsController);
+    event UpkeepPerformed(uint256 indexed epochNumber);
 
     /* =================================================== */
     /*                      ERRORS                         */
@@ -600,6 +601,17 @@ contract EmissionsAutomationAdapterTest is Test {
 
         assertTrue(baseEmissionsControllerMock.mintAndBridgeCurrentEpochCalled());
         assertEq(baseEmissionsControllerMock.mintAndBridgeCallCount(), 1);
+    }
+
+    function test_performUpkeep_emitsUpkeepPerformed() external {
+        baseEmissionsControllerMock.setCurrentEpoch(7);
+        baseEmissionsControllerMock.setEpochMintedAmount(7, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit UpkeepPerformed(7);
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
     }
 
     function test_performUpkeep_noOpWhenAlreadyMinted() external {

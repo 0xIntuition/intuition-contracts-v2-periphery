@@ -46,6 +46,10 @@ contract EmissionsAutomationAdapter is
     /// @param newBaseEmissionsController The new BaseEmissionsController address
     event BaseEmissionsControllerSet(address indexed newBaseEmissionsController);
 
+    /// @notice Emitted when upkeep mints and bridges emissions for an epoch
+    /// @param epochNumber The epoch number for which upkeep was performed
+    event UpkeepPerformed(uint256 indexed epochNumber);
+
     /* =================================================== */
     /*                      ERRORS                         */
     /* =================================================== */
@@ -148,8 +152,11 @@ contract EmissionsAutomationAdapter is
 
     /// @notice Internal function to mint and bridge emissions for the current epoch if needed
     function _mintAndBridgeCurrentEpochIfNeeded() internal {
-        if (!_shouldMint()) return;
+        uint256 currentEpoch = ICoreEmissionsController(address(baseEmissionsController)).getCurrentEpoch();
+        if (baseEmissionsController.getEpochMintedAmount(currentEpoch) != 0) return;
+
         baseEmissionsController.mintAndBridgeCurrentEpoch();
+        emit UpkeepPerformed(currentEpoch);
     }
 
     /// @notice Internal function to determine if minting is needed for the current epoch

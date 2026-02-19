@@ -928,7 +928,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         trustToken.approve(address(trustSwapRouter), trustAmount);
 
-        vm.expectEmit(true, false, false, false);
+        vm.expectEmit(true, true, true, false);
         emit ITrustSwapAndBridgeRouter.TrustBridged(user, trustAmount, bytes32(uint256(uint160(alice))), bytes32(0));
 
         trustSwapRouter.bridgeTrust{ value: bridgeFee }(trustAmount, alice);
