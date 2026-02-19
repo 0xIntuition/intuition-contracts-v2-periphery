@@ -22,6 +22,12 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
 
     /* =================================================== */
+    /*                      EVENTS                         */
+    /* =================================================== */
+
+    event UpkeepPerformed(uint256 indexed epoch);
+
+    /* =================================================== */
     /*                      ERRORS                         */
     /* =================================================== */
 
@@ -427,8 +433,31 @@ contract EmissionsAutomationAdapterTest is BaseTest {
         baseEmissionsControllerMock.setCurrentEpoch(10);
         baseEmissionsControllerMock.setEpochMintedAmount(10, 0);
 
+        vm.expectEmit(true, false, false, false);
+        emit UpkeepPerformed(10);
+
         vm.prank(upkeeper);
         adapter.performUpkeep("");
+    }
+
+    function test_performUpkeep_doesNotEmitEventWhenAlreadyMinted() external {
+        baseEmissionsControllerMock.setCurrentEpoch(5);
+        baseEmissionsControllerMock.setEpochMintedAmount(5, 1000 ether);
+
+        // Record logs to verify no event is emitted
+        vm.recordLogs();
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
+
+        // Get recorded logs and verify no UpkeepPerformed event was emitted
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertFalse(
+                logs[i].topics[0] == keccak256("UpkeepPerformed(uint256)"),
+                "UpkeepPerformed event should not be emitted"
+            );
+        }
     }
 
     function test_performUpkeep_withArbitraryPerformData() external {
@@ -499,6 +528,21 @@ contract EmissionsAutomationAdapterTest is BaseTest {
 
         vm.prank(upkeeper);
         adapter.performUpkeep(performData);
+
+        assertTrue(baseEmissionsControllerMock.mintAndBridgeCurrentEpochCalled());
+    }
+
+    function testFuzz_performUpkeep_emitsEventWithCorrectEpoch(uint256 epoch) external {
+        epoch = bound(epoch, 1, type(uint128).max);
+
+        baseEmissionsControllerMock.setCurrentEpoch(epoch);
+        baseEmissionsControllerMock.setEpochMintedAmount(epoch, 0);
+
+        vm.expectEmit(true, false, false, false);
+        emit UpkeepPerformed(epoch);
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
 
         assertTrue(baseEmissionsControllerMock.mintAndBridgeCurrentEpochCalled());
     }
