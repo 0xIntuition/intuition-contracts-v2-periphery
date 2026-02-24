@@ -156,6 +156,7 @@ contract TrustSwapAndBridgeRouter is
         nonReentrant
         returns (uint256 amountOut, bytes32 transferId)
     {
+        if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
         if (_extractFirstToken(path) != WETH_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH();
         }
@@ -165,7 +166,7 @@ contract TrustSwapAndBridgeRouter is
 
         _validatePoolsExist(path);
 
-        bytes32 recipientAddress = bytes32(uint256(uint160(recipient)));
+        bytes32 recipientAddress = _formatRecipientAddress(recipient);
 
         uint256 bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, minTrustOut);
         if (msg.value <= bridgeFee) {
@@ -208,6 +209,7 @@ contract TrustSwapAndBridgeRouter is
         returns (uint256 amountOut, bytes32 transferId)
     {
         if (amountIn == 0) revert TrustSwapAndBridgeRouter_AmountInZero();
+        if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
         if (tokenIn == address(0) || tokenIn == TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_InvalidToken();
         }
@@ -222,7 +224,7 @@ contract TrustSwapAndBridgeRouter is
 
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
-        bytes32 recipientAddress = bytes32(uint256(uint160(recipient)));
+        bytes32 recipientAddress = _formatRecipientAddress(recipient);
 
         uint256 bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, minTrustOut);
         if (msg.value < bridgeFee) {
@@ -250,13 +252,39 @@ contract TrustSwapAndBridgeRouter is
         emit SwappedAndBridgedFromERC20(msg.sender, tokenIn, amountIn, amountOut, recipientAddress, transferId);
     }
 
+    /// @inheritdoc ITrustSwapAndBridgeRouter
+    function bridgeTrust(
+        uint256 trustAmount,
+        address recipient
+    )
+        external
+        payable
+        nonReentrant
+        returns (bytes32 transferId)
+    {
+        if (trustAmount == 0) revert TrustSwapAndBridgeRouter_AmountInZero();
+        if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
+
+        bytes32 recipientAddress = _formatRecipientAddress(recipient);
+        uint256 bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, trustAmount);
+        if (msg.value < bridgeFee) revert TrustSwapAndBridgeRouter_InsufficientBridgeFee();
+
+        trustToken.safeTransferFrom(msg.sender, address(this), trustAmount);
+        transferId = _bridgeTrust(trustAmount, recipientAddress, bridgeFee);
+
+        uint256 refundAmount = msg.value - bridgeFee;
+        _refundExcess(refundAmount);
+
+        emit TrustBridged(msg.sender, trustAmount, recipientAddress, transferId);
+    }
+
     /* =================================================== */
     /*                   VIEW FUNCTIONS                    */
     /* =================================================== */
 
     /// @inheritdoc ITrustSwapAndBridgeRouter
     function quoteBridgeFee(uint256 trustAmount, address recipient) external view returns (uint256 bridgeFee) {
-        bytes32 recipientAddress = bytes32(uint256(uint160(recipient)));
+        bytes32 recipientAddress = _formatRecipientAddress(recipient);
         bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, trustAmount);
     }
 
@@ -276,6 +304,11 @@ contract TrustSwapAndBridgeRouter is
     /* =================================================== */
     /*                 INTERNAL FUNCTIONS                  */
     /* =================================================== */
+
+    /// @dev Formats an EVM address into Metalayer recipient bytes32 format.
+    function _formatRecipientAddress(address recipient) internal pure returns (bytes32 formattedRecipientAddress) {
+        formattedRecipientAddress = bytes32(uint256(uint160(recipient)));
+    }
 
     /**
      * @dev Extracts the first token address from a packed Slipstream path.

@@ -251,6 +251,55 @@ contract TrustSwapAndBridgeRouterFork is Test {
     }
 
     /* =================================================== */
+    /*               TEST 4: DIRECT TRUST BRIDGE          */
+    /* =================================================== */
+
+    function test_fork_bridgeTrust_successful() external {
+        uint256 trustAmount = 10e18;
+        deal(TRUST, user, trustAmount);
+
+        uint256 routerTrustBefore = IERC20(TRUST).balanceOf(address(router));
+
+        vm.startPrank(user);
+        IERC20(TRUST).approve(address(router), trustAmount);
+        bytes32 transferId = router.bridgeTrust{ value: MOCK_BRIDGE_FEE }(trustAmount, recipient);
+        vm.stopPrank();
+
+        assertEq(transferId, MOCK_TRANSFER_ID, "Transfer ID should match mock");
+        assertEq(IERC20(TRUST).balanceOf(user), 0, "User TRUST should be spent");
+        assertEq(IERC20(TRUST).balanceOf(address(router)), routerTrustBefore + trustAmount, "Router should hold TRUST");
+    }
+
+    function test_fork_bridgeTrust_refundsExcessETH() external {
+        uint256 trustAmount = 3e18;
+        uint256 excessEth = 0.2 ether;
+        uint256 totalValue = MOCK_BRIDGE_FEE + excessEth;
+
+        deal(TRUST, user, trustAmount);
+        uint256 userEthBefore = user.balance;
+
+        vm.startPrank(user);
+        IERC20(TRUST).approve(address(router), trustAmount);
+        router.bridgeTrust{ value: totalValue }(trustAmount, recipient);
+        vm.stopPrank();
+
+        assertEq(user.balance, userEthBefore - MOCK_BRIDGE_FEE, "Only bridge fee should be deducted");
+    }
+
+    function test_fork_bridgeTrust_revertsOnInsufficientBridgeFee() external {
+        uint256 trustAmount = 1e18;
+        deal(TRUST, user, trustAmount);
+
+        vm.startPrank(user);
+        IERC20(TRUST).approve(address(router), trustAmount);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InsufficientBridgeFee.selector)
+        );
+        router.bridgeTrust{ value: MOCK_BRIDGE_FEE - 1 }(trustAmount, recipient);
+        vm.stopPrank();
+    }
+
+    /* =================================================== */
     /*              QUOTE FUNCTIONS (FORK)                 */
     /* =================================================== */
 

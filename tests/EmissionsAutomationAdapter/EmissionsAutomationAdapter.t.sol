@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
-import { BaseTest } from "tests/BaseTest.t.sol";
+import { Test } from "forge-std/src/Test.sol";
+
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+
 import { EmissionsAutomationAdapter } from "contracts/EmissionsAutomationAdapter.sol";
 import { BaseEmissionsControllerMock } from "tests/mocks/BaseEmissionsControllerMock.sol";
-import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-contract EmissionsAutomationAdapterTest is BaseTest {
+contract EmissionsAutomationAdapterTest is Test {
     /* =================================================== */
     /*                  STATE VARIABLES                    */
     /* =================================================== */
 
     EmissionsAutomationAdapter public adapter;
+    EmissionsAutomationAdapter public adapterImplementation;
+    TransparentUpgradeableProxy public adapterProxy;
     BaseEmissionsControllerMock public baseEmissionsControllerMock;
 
     address public admin;
@@ -20,6 +27,13 @@ contract EmissionsAutomationAdapterTest is BaseTest {
 
     bytes32 public constant UPKEEP_ROLE = keccak256("UPKEEP_ROLE");
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+
+    /* =================================================== */
+    /*                      EVENTS                         */
+    /* =================================================== */
+
+    event BaseEmissionsControllerSet(address indexed newBaseEmissionsController);
+    event UpkeepPerformed(uint256 indexed epochNumber);
 
     /* =================================================== */
     /*                      ERRORS                         */
@@ -31,53 +45,104 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     /*                   SETUP FUNCTION                    */
     /* =================================================== */
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
+        admin = makeAddr("admin");
+        upkeeper = makeAddr("upkeeper");
+        unauthorized = makeAddr("unauthorized");
 
-        vm.stopPrank();
-
-        admin = createUser("admin");
-        upkeeper = createUser("upkeeper");
-        unauthorized = createUser("unauthorized");
+        vm.deal(admin, 10_000 ether);
+        vm.deal(upkeeper, 10_000 ether);
+        vm.deal(unauthorized, 10_000 ether);
 
         baseEmissionsControllerMock = new BaseEmissionsControllerMock();
         baseEmissionsControllerMock.setCurrentEpoch(1);
 
-        adapter = new EmissionsAutomationAdapter(admin, address(baseEmissionsControllerMock));
+        adapterImplementation = new EmissionsAutomationAdapter();
+
+        bytes memory initData = abi.encodeWithSelector(
+            EmissionsAutomationAdapter.initialize.selector, admin, address(baseEmissionsControllerMock)
+        );
+
+        adapterProxy = new TransparentUpgradeableProxy(address(adapterImplementation), admin, initData);
+
+        adapter = EmissionsAutomationAdapter(address(adapterProxy));
 
         vm.prank(admin);
         adapter.grantRole(UPKEEP_ROLE, upkeeper);
     }
 
     /* =================================================== */
-    /*              CONSTRUCTOR TESTS                      */
+    /*              INITIALIZER TESTS                      */
     /* =================================================== */
 
-    function test_constructor_successful() external {
-        EmissionsAutomationAdapter newAdapter =
-            new EmissionsAutomationAdapter(admin, address(baseEmissionsControllerMock));
-
-        assertEq(address(newAdapter.baseEmissionsController()), address(baseEmissionsControllerMock));
-        assertTrue(newAdapter.hasRole(DEFAULT_ADMIN_ROLE, admin));
+    function test_initialize_successful() external view {
+        assertEq(address(adapter.baseEmissionsController()), address(baseEmissionsControllerMock));
+        assertTrue(adapter.hasRole(DEFAULT_ADMIN_ROLE, admin));
     }
 
-    function test_constructor_revertsOnInvalidAdminAddress() external {
+    function test_initialize_revertsOnDoubleInitialization() external {
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        adapter.initialize(admin, address(baseEmissionsControllerMock));
+    }
+
+    function test_initialize_revertsOnInvalidAdminAddress() external {
+        EmissionsAutomationAdapter newImpl = new EmissionsAutomationAdapter();
+
         vm.expectRevert(abi.encodeWithSelector(EmissionsAutomationAdapter_InvalidAddress.selector));
-        new EmissionsAutomationAdapter(address(0), address(baseEmissionsControllerMock));
+        new TransparentUpgradeableProxy(
+            address(newImpl),
+            admin,
+            abi.encodeWithSelector(
+                EmissionsAutomationAdapter.initialize.selector, address(0), address(baseEmissionsControllerMock)
+            )
+        );
     }
 
-    function test_constructor_revertsOnInvalidBaseEmissionsControllerAddress() external {
+    function test_initialize_revertsOnInvalidBaseEmissionsControllerAddress() external {
+        EmissionsAutomationAdapter newImpl = new EmissionsAutomationAdapter();
+
         vm.expectRevert(abi.encodeWithSelector(EmissionsAutomationAdapter_InvalidAddress.selector));
-        new EmissionsAutomationAdapter(admin, address(0));
+        new TransparentUpgradeableProxy(
+            address(newImpl),
+            admin,
+            abi.encodeWithSelector(EmissionsAutomationAdapter.initialize.selector, admin, address(0))
+        );
     }
 
-    function testFuzz_constructor_successful(address _admin, address _baseEmissionsController) external {
+    function test_initialize_emitsBaseEmissionsControllerSetEvent() external {
+        EmissionsAutomationAdapter newImpl = new EmissionsAutomationAdapter();
+
+        vm.expectEmit(true, true, true, true);
+        emit BaseEmissionsControllerSet(address(baseEmissionsControllerMock));
+
+        new TransparentUpgradeableProxy(
+            address(newImpl),
+            makeAddr("proxyAdmin"),
+            abi.encodeWithSelector(
+                EmissionsAutomationAdapter.initialize.selector, admin, address(baseEmissionsControllerMock)
+            )
+        );
+    }
+
+    function testFuzz_initialize_successful(address _admin, address _baseEmissionsController) external {
         vm.assume(_admin != address(0));
         vm.assume(_baseEmissionsController != address(0));
         vm.assume(_admin.code.length == 0);
         vm.assume(_baseEmissionsController.code.length == 0);
 
-        EmissionsAutomationAdapter newAdapter = new EmissionsAutomationAdapter(_admin, _baseEmissionsController);
+        // Exclude precompiled contracts
+        vm.assume(_admin > address(0xA));
+        vm.assume(_baseEmissionsController > address(0xA));
+
+        EmissionsAutomationAdapter newImpl = new EmissionsAutomationAdapter();
+
+        TransparentUpgradeableProxy newProxy = new TransparentUpgradeableProxy(
+            address(newImpl),
+            makeAddr("proxyAdmin"),
+            abi.encodeWithSelector(EmissionsAutomationAdapter.initialize.selector, _admin, _baseEmissionsController)
+        );
+
+        EmissionsAutomationAdapter newAdapter = EmissionsAutomationAdapter(address(newProxy));
 
         assertEq(address(newAdapter.baseEmissionsController()), _baseEmissionsController);
         assertTrue(newAdapter.hasRole(DEFAULT_ADMIN_ROLE, _admin));
@@ -88,7 +153,7 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     /* =================================================== */
 
     function test_grantRole_adminCanGrantUpkeepRole() external {
-        address newUpkeeper = createUser("newUpkeeper");
+        address newUpkeeper = makeAddr("newUpkeeper");
 
         vm.prank(admin);
         adapter.grantRole(UPKEEP_ROLE, newUpkeeper);
@@ -97,7 +162,7 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     }
 
     function test_grantRole_upkeeperCanCallFunctionsAfterRoleGrant() external {
-        address newUpkeeper = createUser("newUpkeeper");
+        address newUpkeeper = makeAddr("newUpkeeper");
 
         vm.prank(admin);
         adapter.grantRole(UPKEEP_ROLE, newUpkeeper);
@@ -131,25 +196,173 @@ contract EmissionsAutomationAdapterTest is BaseTest {
         adapter.performUpkeep("");
     }
 
-    function test_hasRole_returnsCorrectRoleStatus() external {
+    function test_hasRole_returnsCorrectRoleStatus() external view {
         assertTrue(adapter.hasRole(DEFAULT_ADMIN_ROLE, admin));
         assertTrue(adapter.hasRole(UPKEEP_ROLE, upkeeper));
         assertFalse(adapter.hasRole(UPKEEP_ROLE, unauthorized));
         assertFalse(adapter.hasRole(DEFAULT_ADMIN_ROLE, unauthorized));
     }
 
-    function test_getRoleAdmin_upkeepRoleHasDefaultAdminAsAdmin() external {
+    function test_getRoleAdmin_upkeepRoleHasDefaultAdminAsAdmin() external view {
         assertEq(adapter.getRoleAdmin(UPKEEP_ROLE), DEFAULT_ADMIN_ROLE);
     }
 
     function testFuzz_grantRole_adminCanGrantUpkeepRoleToAnyAddress(address newUpkeeper) external {
         vm.assume(newUpkeeper != address(0));
-        _excludeReservedAddresses(newUpkeeper);
+        vm.assume(newUpkeeper > address(0xA));
+        vm.assume(newUpkeeper.code.length == 0);
 
         vm.prank(admin);
         adapter.grantRole(UPKEEP_ROLE, newUpkeeper);
 
         assertTrue(adapter.hasRole(UPKEEP_ROLE, newUpkeeper));
+    }
+
+    /* =================================================== */
+    /*         SET BASE EMISSIONS CONTROLLER TESTS         */
+    /* =================================================== */
+
+    function test_setBaseEmissionsController_successful() external {
+        BaseEmissionsControllerMock newController = new BaseEmissionsControllerMock();
+
+        vm.prank(admin);
+        adapter.setBaseEmissionsController(address(newController));
+
+        assertEq(address(adapter.baseEmissionsController()), address(newController));
+    }
+
+    function test_setBaseEmissionsController_emitsEvent() external {
+        BaseEmissionsControllerMock newController = new BaseEmissionsControllerMock();
+
+        vm.expectEmit(true, true, true, true);
+        emit BaseEmissionsControllerSet(address(newController));
+
+        vm.prank(admin);
+        adapter.setBaseEmissionsController(address(newController));
+    }
+
+    function test_setBaseEmissionsController_revertsOnZeroAddress() external {
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(EmissionsAutomationAdapter_InvalidAddress.selector));
+        adapter.setBaseEmissionsController(address(0));
+        vm.stopPrank();
+    }
+
+    function test_setBaseEmissionsController_revertsOnUnauthorizedCaller() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, DEFAULT_ADMIN_ROLE
+            )
+        );
+
+        vm.prank(unauthorized);
+        adapter.setBaseEmissionsController(makeAddr("newController"));
+    }
+
+    function test_setBaseEmissionsController_updatesControllerReference() external {
+        BaseEmissionsControllerMock newController = new BaseEmissionsControllerMock();
+        newController.setCurrentEpoch(42);
+        newController.setEpochMintedAmount(42, 0);
+
+        vm.prank(admin);
+        adapter.setBaseEmissionsController(address(newController));
+
+        (bool upkeepNeeded,) = adapter.checkUpkeep("");
+        assertTrue(upkeepNeeded);
+    }
+
+    function testFuzz_setBaseEmissionsController_successful(address _controller) external {
+        vm.assume(_controller != address(0));
+        vm.assume(_controller > address(0xA));
+
+        vm.prank(admin);
+        adapter.setBaseEmissionsController(_controller);
+
+        assertEq(address(adapter.baseEmissionsController()), _controller);
+    }
+
+    /* =================================================== */
+    /*              PAUSABLE TESTS                         */
+    /* =================================================== */
+
+    function test_pause_adminCanPause() external {
+        vm.prank(admin);
+        adapter.pause();
+
+        assertTrue(adapter.paused());
+    }
+
+    function test_unpause_adminCanUnpause() external {
+        vm.startPrank(admin);
+        adapter.pause();
+        adapter.unpause();
+        vm.stopPrank();
+
+        assertFalse(adapter.paused());
+    }
+
+    function test_performUpkeep_revertsWhenPaused() external {
+        baseEmissionsControllerMock.setCurrentEpoch(5);
+        baseEmissionsControllerMock.setEpochMintedAmount(5, 0);
+
+        vm.prank(admin);
+        adapter.pause();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
+    }
+
+    function test_performUpkeep_worksAfterUnpause() external {
+        baseEmissionsControllerMock.setCurrentEpoch(5);
+        baseEmissionsControllerMock.setEpochMintedAmount(5, 0);
+
+        vm.startPrank(admin);
+        adapter.pause();
+        adapter.unpause();
+        vm.stopPrank();
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
+
+        assertTrue(baseEmissionsControllerMock.mintAndBridgeCurrentEpochCalled());
+    }
+
+    function test_pause_revertsOnUnauthorizedCaller() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, DEFAULT_ADMIN_ROLE
+            )
+        );
+
+        vm.prank(unauthorized);
+        adapter.pause();
+    }
+
+    function test_unpause_revertsOnUnauthorizedCaller() external {
+        vm.prank(admin);
+        adapter.pause();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, DEFAULT_ADMIN_ROLE
+            )
+        );
+
+        vm.prank(unauthorized);
+        adapter.unpause();
+    }
+
+    function test_checkUpkeep_worksWhenPaused() external {
+        baseEmissionsControllerMock.setCurrentEpoch(5);
+        baseEmissionsControllerMock.setEpochMintedAmount(5, 0);
+
+        vm.prank(admin);
+        adapter.pause();
+
+        (bool upkeepNeeded,) = adapter.checkUpkeep("");
+        assertTrue(upkeepNeeded);
     }
 
     /* =================================================== */
@@ -188,8 +401,8 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     }
 
     function test_edgeCase_multipleUpkeepersCanCallFunction() external {
-        address upkeeper1 = createUser("upkeeper1");
-        address upkeeper2 = createUser("upkeeper2");
+        address upkeeper1 = makeAddr("upkeeper1");
+        address upkeeper2 = makeAddr("upkeeper2");
 
         vm.startPrank(admin);
         adapter.grantRole(UPKEEP_ROLE, upkeeper1);
@@ -239,19 +452,6 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     }
 
     /* =================================================== */
-    /*              IMMUTABLE VARIABLE TESTS               */
-    /* =================================================== */
-
-    function test_baseEmissionsController_isImmutable() external {
-        address initialController = address(adapter.baseEmissionsController());
-        assertEq(initialController, address(baseEmissionsControllerMock));
-
-        baseEmissionsControllerMock.setCurrentEpoch(100);
-
-        assertEq(address(adapter.baseEmissionsController()), initialController);
-    }
-
-    /* =================================================== */
     /*              REENTRANCY TESTS                       */
     /* =================================================== */
 
@@ -269,7 +469,7 @@ contract EmissionsAutomationAdapterTest is BaseTest {
     /*              CONSTANT TESTS                         */
     /* =================================================== */
 
-    function test_constant_upkeepRoleValue() external {
+    function test_constant_upkeepRoleValue() external view {
         assertEq(adapter.UPKEEP_ROLE(), keccak256("UPKEEP_ROLE"));
     }
 
@@ -403,6 +603,17 @@ contract EmissionsAutomationAdapterTest is BaseTest {
         assertEq(baseEmissionsControllerMock.mintAndBridgeCallCount(), 1);
     }
 
+    function test_performUpkeep_emitsUpkeepPerformed() external {
+        baseEmissionsControllerMock.setCurrentEpoch(7);
+        baseEmissionsControllerMock.setEpochMintedAmount(7, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit UpkeepPerformed(7);
+
+        vm.prank(upkeeper);
+        adapter.performUpkeep("");
+    }
+
     function test_performUpkeep_noOpWhenAlreadyMinted() external {
         baseEmissionsControllerMock.setCurrentEpoch(5);
         baseEmissionsControllerMock.setEpochMintedAmount(5, 1000 ether);
@@ -420,14 +631,6 @@ contract EmissionsAutomationAdapterTest is BaseTest {
         );
 
         vm.prank(unauthorized);
-        adapter.performUpkeep("");
-    }
-
-    function test_performUpkeep_emitsEventWithCorrectParameters() external {
-        baseEmissionsControllerMock.setCurrentEpoch(10);
-        baseEmissionsControllerMock.setEpochMintedAmount(10, 0);
-
-        vm.prank(upkeeper);
         adapter.performUpkeep("");
     }
 
