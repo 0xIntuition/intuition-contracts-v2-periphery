@@ -182,6 +182,10 @@ contract MockMetaERC20Hub {
 }
 
 contract TrustSwapAndBridgeRouterHarness is TrustSwapAndBridgeRouter {
+    function exposedExtractTokenAtOffset(bytes calldata path, uint256 offset) external pure returns (address token) {
+        token = _extractTokenAtOffset(path, offset);
+    }
+
     function exposedExtractLastToken(bytes calldata path) external pure returns (address token) {
         uint256 lastTokenOffset = path.length >= 20 ? path.length - 20 : 0;
         token = _extractTokenAtOffset(path, lastTokenOffset);
@@ -861,6 +865,15 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
         routerHarness.exposedExtractLastToken(shortPath);
+    }
+
+    function test_extractTokenAtOffset_revertsOnOutOfRangeOffset_viaHarness() public {
+        TrustSwapAndBridgeRouterHarness routerHarness = new TrustSwapAndBridgeRouterHarness();
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+        uint256 invalidOffset = path.length - 20 + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
+        routerHarness.exposedExtractTokenAtOffset(path, invalidOffset);
     }
 
     function test_validatePoolsExist_revertsOnPathTooShort_viaHarness() public {
