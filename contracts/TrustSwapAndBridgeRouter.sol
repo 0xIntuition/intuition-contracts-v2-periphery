@@ -80,10 +80,10 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
         returns (uint256 amountOut, bytes32 transferId)
     {
         if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
-        if (_extractFirstToken(path) != WETH_ADDRESS) {
+        if (_extractTokenAtOffset(path, 0) != WETH_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH();
         }
-        if (_extractLastToken(path) != TRUST_ADDRESS) {
+        if (_extractTokenAtOffset(path, path.length >= ADDR_SIZE ? path.length - ADDR_SIZE : 0) != TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST();
         }
 
@@ -136,10 +136,10 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
         if (tokenIn == address(0) || tokenIn == TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_InvalidToken();
         }
-        if (_extractFirstToken(path) != tokenIn) {
+        if (_extractTokenAtOffset(path, 0) != tokenIn) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithToken();
         }
-        if (_extractLastToken(path) != TRUST_ADDRESS) {
+        if (_extractTokenAtOffset(path, path.length >= ADDR_SIZE ? path.length - ADDR_SIZE : 0) != TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST();
         }
 
@@ -231,25 +231,13 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
         formattedRecipientAddress = bytes32(uint256(uint160(recipient)));
     }
 
-    /**
-     * @dev Extracts the first token address from a packed Slipstream path.
-     *      Path format: token0 (20 bytes) | tickSpacing (3 bytes) | token1 (20 bytes) | ...
-     */
-    function _extractFirstToken(bytes calldata path) internal pure returns (address token) {
+    /// @dev Extracts a token address from a packed Slipstream path at a byte offset.
+    ///      Path format: token0 (20 bytes) | tickSpacing (3 bytes) | token1 (20 bytes) | ...
+    function _extractTokenAtOffset(bytes calldata path, uint256 offset) internal pure returns (address token) {
         if (path.length < MIN_PATH_LENGTH) revert TrustSwapAndBridgeRouter_InvalidPath();
+        if (offset > path.length - ADDR_SIZE) revert TrustSwapAndBridgeRouter_InvalidPath();
         assembly {
-            token := shr(96, calldataload(path.offset))
-        }
-    }
-
-    /**
-     * @dev Extracts the last token address from a packed Slipstream path.
-     *      The last 20 bytes of the path contain the final token address.
-     */
-    function _extractLastToken(bytes calldata path) internal pure returns (address token) {
-        if (path.length < MIN_PATH_LENGTH) revert TrustSwapAndBridgeRouter_InvalidPath();
-        assembly {
-            token := shr(96, calldataload(add(path.offset, sub(path.length, 20))))
+            token := shr(96, calldataload(add(path.offset, offset)))
         }
     }
 

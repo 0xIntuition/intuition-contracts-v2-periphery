@@ -183,7 +183,8 @@ contract MockMetaERC20Hub {
 
 contract TrustSwapAndBridgeRouterHarness is TrustSwapAndBridgeRouter {
     function exposedExtractLastToken(bytes calldata path) external pure returns (address token) {
-        token = _extractLastToken(path);
+        uint256 lastTokenOffset = path.length >= 20 ? path.length - 20 : 0;
+        token = _extractTokenAtOffset(path, lastTokenOffset);
     }
 
     function exposedValidatePoolsExist(bytes calldata path) external view {
