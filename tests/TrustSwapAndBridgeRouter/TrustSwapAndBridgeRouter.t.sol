@@ -4,13 +4,11 @@ pragma solidity 0.8.29;
 import { Test } from "forge-std/src/Test.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { TrustSwapAndBridgeRouter } from "contracts/TrustSwapAndBridgeRouter.sol";
-import { ITrustSwapAndBridgeRouter, RouterConfig } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
+import { ITrustSwapAndBridgeRouter } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
 import { ISlipstreamSwapRouter } from "contracts/interfaces/external/aerodrome/ISlipstreamSwapRouter.sol";
-import { FinalityState, IMetaERC20Hub } from "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol";
+import { FinalityState } from "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol";
 
 /* =================================================== */
 /*                       MOCKS                         */
@@ -183,14 +181,36 @@ contract MockMetaERC20Hub {
     }
 }
 
+contract TrustSwapAndBridgeRouterHarness is TrustSwapAndBridgeRouter {
+    function exposedExtractLastToken(bytes calldata path) external pure returns (address token) {
+        token = _extractLastToken(path);
+    }
+
+    function exposedValidatePoolsExist(bytes calldata path) external view {
+        _validatePoolsExist(path);
+    }
+
+    function exposedRefundExcess(uint256 refundAmount) external {
+        _refundExcess(refundAmount);
+    }
+}
+
+contract RejectETHRefundReceiver {
+    receive() external payable {
+        revert("RejectETHRefundReceiver: reject");
+    }
+
+    function callRefundExcess(TrustSwapAndBridgeRouterHarness routerHarness, uint256 refundAmount) external {
+        routerHarness.exposedRefundExcess(refundAmount);
+    }
+}
+
 /* =================================================== */
 /*                       TESTS                         */
 /* =================================================== */
 
 contract TrustSwapAndBridgeRouterTest is Test {
     TrustSwapAndBridgeRouter public trustSwapRouter;
-    TrustSwapAndBridgeRouter public trustSwapRouterImplementation;
-    TransparentUpgradeableProxy public trustSwapRouterProxy;
     MockMetaERC20Hub public metaERC20Hub;
     MockSlipstreamSwapRouter public swapRouter;
     MockCLFactory public clFactory;
@@ -199,7 +219,6 @@ contract TrustSwapAndBridgeRouterTest is Test {
     MockERC20 public usdcToken;
     MockERC20 public trustToken;
 
-    address public owner = makeAddr("owner");
     address public user = makeAddr("user");
     address public alice = makeAddr("alice");
 
@@ -210,9 +229,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
     int24 public constant TICK_SPACING_100 = 100;
     int24 public constant TICK_SPACING_200 = 200;
 
-    uint32 public constant RECIPIENT_DOMAIN = 1;
+    uint32 public constant RECIPIENT_DOMAIN = 1155;
     uint256 public constant BRIDGE_GAS_LIMIT = 100_000;
-    FinalityState public constant FINALITY_STATE = FinalityState.FINALIZED;
+    FinalityState public constant FINALITY_STATE = FinalityState.INSTANT;
     uint256 public constant DEFAULT_OUTPUT_MULTIPLIER = 1e12;
 
     address public constant MOCK_POOL_1 = address(0xDEAD1);
@@ -234,32 +253,29 @@ contract TrustSwapAndBridgeRouterTest is Test {
         trustToken.initialize("Trust Token", "TRUST", 18);
         MockWETH(BASE_MAINNET_WETH).initialize("Wrapped Ether", "WETH", 18);
 
-        swapRouter = new MockSlipstreamSwapRouter();
-        clFactory = new MockCLFactory();
-        clQuoter = new MockCLQuoter();
-        metaERC20Hub = new MockMetaERC20Hub();
+        MockSlipstreamSwapRouter swapRouterTemplate = new MockSlipstreamSwapRouter();
+        MockCLFactory clFactoryTemplate = new MockCLFactory();
+        MockCLQuoter clQuoterTemplate = new MockCLQuoter();
+        MockMetaERC20Hub metaERC20HubTemplate = new MockMetaERC20Hub();
+
+        trustSwapRouter = new TrustSwapAndBridgeRouter();
+
+        vm.etch(trustSwapRouter.slipstreamSwapRouter(), address(swapRouterTemplate).code);
+        vm.etch(address(trustSwapRouter.slipstreamFactory()), address(clFactoryTemplate).code);
+        vm.etch(trustSwapRouter.slipstreamQuoter(), address(clQuoterTemplate).code);
+        vm.etch(address(trustSwapRouter.metaERC20Hub()), address(metaERC20HubTemplate).code);
+
+        swapRouter = MockSlipstreamSwapRouter(trustSwapRouter.slipstreamSwapRouter());
+        clFactory = MockCLFactory(address(trustSwapRouter.slipstreamFactory()));
+        clQuoter = MockCLQuoter(trustSwapRouter.slipstreamQuoter());
+        metaERC20Hub = MockMetaERC20Hub(address(trustSwapRouter.metaERC20Hub()));
+
+        swapRouter.setOutputMultiplier(DEFAULT_OUTPUT_MULTIPLIER);
+        clQuoter.setOutputMultiplier(DEFAULT_OUTPUT_MULTIPLIER);
 
         clFactory.setPool(BASE_MAINNET_USDC, BASE_MAINNET_TRUST, TICK_SPACING_100, MOCK_POOL_1);
         clFactory.setPool(BASE_MAINNET_WETH, BASE_MAINNET_USDC, TICK_SPACING_200, MOCK_POOL_2);
         clFactory.setPool(BASE_MAINNET_WETH, BASE_MAINNET_TRUST, TICK_SPACING_100, MOCK_POOL_1);
-
-        trustSwapRouterImplementation = new TrustSwapAndBridgeRouter();
-
-        RouterConfig memory config = RouterConfig({
-            slipstreamSwapRouter: address(swapRouter),
-            slipstreamFactory: address(clFactory),
-            slipstreamQuoter: address(clQuoter),
-            metaERC20Hub: address(metaERC20Hub),
-            recipientDomain: RECIPIENT_DOMAIN,
-            bridgeGasLimit: BRIDGE_GAS_LIMIT,
-            finalityState: FINALITY_STATE
-        });
-
-        bytes memory initData = abi.encodeWithSelector(TrustSwapAndBridgeRouter.initialize.selector, owner, config);
-
-        trustSwapRouterProxy = new TransparentUpgradeableProxy(address(trustSwapRouterImplementation), owner, initData);
-
-        trustSwapRouter = TrustSwapAndBridgeRouter(payable(address(trustSwapRouterProxy)));
 
         usdcToken.mint(user, 1_000_000e6);
         usdcToken.mint(alice, 1_000_000e6);
@@ -302,212 +318,18 @@ contract TrustSwapAndBridgeRouterTest is Test {
     }
 
     /* =================================================== */
-    /*                 INITIALIZATION TESTS                */
+    /*               CONSTANT / VIEW TESTS                 */
     /* =================================================== */
 
-    function test_initialize_successful() public view {
+    function test_constantsAndViews_matchExpectedMainnetConfig() public view {
         assertEq(address(trustSwapRouter.trustToken()), BASE_MAINNET_TRUST);
-        assertEq(trustSwapRouter.owner(), owner);
-        assertEq(trustSwapRouter.slipstreamSwapRouter(), address(swapRouter));
-        assertEq(address(trustSwapRouter.slipstreamFactory()), address(clFactory));
-        assertEq(trustSwapRouter.slipstreamQuoter(), address(clQuoter));
-        assertEq(address(trustSwapRouter.metaERC20Hub()), address(metaERC20Hub));
+        assertEq(trustSwapRouter.slipstreamSwapRouter(), 0xcbBb8035cAc7D4B3Ca7aBb74cF7BdF900215Ce0D);
+        assertEq(address(trustSwapRouter.slipstreamFactory()), 0xaDe65c38CD4849aDBA595a4323a8C7DdfE89716a);
+        assertEq(trustSwapRouter.slipstreamQuoter(), 0x3d4C22254F86f64B7eC90ab8F7aeC1FBFD271c6C);
+        assertEq(address(trustSwapRouter.metaERC20Hub()), 0xE12aaF1529Ae21899029a9b51cca2F2Bc2cfC421);
         assertEq(trustSwapRouter.recipientDomain(), RECIPIENT_DOMAIN);
         assertEq(trustSwapRouter.bridgeGasLimit(), BRIDGE_GAS_LIMIT);
         assertTrue(trustSwapRouter.finalityState() == FINALITY_STATE);
-    }
-
-    function test_initialize_revertsOnDoubleInitialization() public {
-        RouterConfig memory config = RouterConfig({
-            slipstreamSwapRouter: address(swapRouter),
-            slipstreamFactory: address(clFactory),
-            slipstreamQuoter: address(clQuoter),
-            metaERC20Hub: address(metaERC20Hub),
-            recipientDomain: RECIPIENT_DOMAIN,
-            bridgeGasLimit: BRIDGE_GAS_LIMIT,
-            finalityState: FINALITY_STATE
-        });
-
-        vm.expectRevert();
-        trustSwapRouter.initialize(owner, config);
-    }
-
-    /* =================================================== */
-    /*                 ADMIN FUNCTION TESTS                */
-    /* =================================================== */
-
-    function test_setSlipstreamSwapRouter_successful() public {
-        address newRouter = makeAddr("newRouter");
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.SlipstreamSwapRouterSet(newRouter);
-
-        vm.prank(owner);
-        trustSwapRouter.setSlipstreamSwapRouter(newRouter);
-
-        assertEq(trustSwapRouter.slipstreamSwapRouter(), newRouter);
-    }
-
-    function test_setSlipstreamSwapRouter_revertsOnZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidAddress.selector)
-        );
-        trustSwapRouter.setSlipstreamSwapRouter(address(0));
-    }
-
-    function test_setSlipstreamSwapRouter_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setSlipstreamSwapRouter(makeAddr("newRouter"));
-    }
-
-    function test_setSlipstreamFactory_successful() public {
-        address newFactory = makeAddr("newFactory");
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.SlipstreamFactorySet(newFactory);
-
-        vm.prank(owner);
-        trustSwapRouter.setSlipstreamFactory(newFactory);
-
-        assertEq(address(trustSwapRouter.slipstreamFactory()), newFactory);
-    }
-
-    function test_setSlipstreamFactory_revertsOnZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidAddress.selector)
-        );
-        trustSwapRouter.setSlipstreamFactory(address(0));
-    }
-
-    function test_setSlipstreamFactory_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setSlipstreamFactory(makeAddr("newFactory"));
-    }
-
-    function test_setSlipstreamQuoter_successful() public {
-        address newQuoter = makeAddr("newQuoter");
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.SlipstreamQuoterSet(newQuoter);
-
-        vm.prank(owner);
-        trustSwapRouter.setSlipstreamQuoter(newQuoter);
-
-        assertEq(trustSwapRouter.slipstreamQuoter(), newQuoter);
-    }
-
-    function test_setSlipstreamQuoter_revertsOnZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidAddress.selector)
-        );
-        trustSwapRouter.setSlipstreamQuoter(address(0));
-    }
-
-    function test_setSlipstreamQuoter_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setSlipstreamQuoter(makeAddr("newQuoter"));
-    }
-
-    function test_setMetaERC20Hub_successful() public {
-        address newHub = makeAddr("newHub");
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.MetaERC20HubSet(newHub);
-
-        vm.prank(owner);
-        trustSwapRouter.setMetaERC20Hub(newHub);
-
-        assertEq(address(trustSwapRouter.metaERC20Hub()), newHub);
-    }
-
-    function test_setMetaERC20Hub_revertsOnZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidAddress.selector)
-        );
-        trustSwapRouter.setMetaERC20Hub(address(0));
-    }
-
-    function test_setMetaERC20Hub_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setMetaERC20Hub(makeAddr("newHub"));
-    }
-
-    function test_setRecipientDomain_successful() public {
-        uint32 newDomain = 42;
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.RecipientDomainSet(newDomain);
-
-        vm.prank(owner);
-        trustSwapRouter.setRecipientDomain(newDomain);
-
-        assertEq(trustSwapRouter.recipientDomain(), newDomain);
-    }
-
-    function test_setRecipientDomain_revertsOnZero() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipientDomain.selector)
-        );
-        trustSwapRouter.setRecipientDomain(0);
-    }
-
-    function test_setRecipientDomain_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setRecipientDomain(42);
-    }
-
-    function test_setBridgeGasLimit_successful() public {
-        uint256 newGasLimit = 200_000;
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.BridgeGasLimitSet(newGasLimit);
-
-        vm.prank(owner);
-        trustSwapRouter.setBridgeGasLimit(newGasLimit);
-
-        assertEq(trustSwapRouter.bridgeGasLimit(), newGasLimit);
-    }
-
-    function test_setBridgeGasLimit_revertsOnZero() public {
-        vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidBridgeGasLimit.selector)
-        );
-        trustSwapRouter.setBridgeGasLimit(0);
-    }
-
-    function test_setBridgeGasLimit_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setBridgeGasLimit(200_000);
-    }
-
-    function test_setFinalityState_successful() public {
-        FinalityState newState = FinalityState.ESPRESSO;
-
-        vm.expectEmit(true, true, true, true);
-        emit ITrustSwapAndBridgeRouter.FinalityStateSet(newState);
-
-        vm.prank(owner);
-        trustSwapRouter.setFinalityState(newState);
-
-        assertTrue(trustSwapRouter.finalityState() == newState);
-    }
-
-    function test_setFinalityState_revertsOnNonOwner() public {
-        vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
-        trustSwapRouter.setFinalityState(FinalityState.ESPRESSO);
     }
 
     /* =================================================== */
@@ -1029,6 +851,39 @@ contract TrustSwapAndBridgeRouterTest is Test {
     }
 
     /* =================================================== */
+    /*              INTERNAL COVERAGE TESTS                */
+    /* =================================================== */
+
+    function test_extractLastToken_revertsOnPathTooShort_viaHarness() public {
+        TrustSwapAndBridgeRouterHarness routerHarness = new TrustSwapAndBridgeRouterHarness();
+        bytes memory shortPath = abi.encodePacked(BASE_MAINNET_WETH);
+
+        vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
+        routerHarness.exposedExtractLastToken(shortPath);
+    }
+
+    function test_validatePoolsExist_revertsOnPathTooShort_viaHarness() public {
+        TrustSwapAndBridgeRouterHarness routerHarness = new TrustSwapAndBridgeRouterHarness();
+        bytes memory shortPath = abi.encodePacked(BASE_MAINNET_USDC);
+
+        vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
+        routerHarness.exposedValidatePoolsExist(shortPath);
+    }
+
+    function test_refundExcess_revertsWhenRecipientRejectsETH_viaHarness() public {
+        TrustSwapAndBridgeRouterHarness routerHarness = new TrustSwapAndBridgeRouterHarness();
+        RejectETHRefundReceiver rejectingReceiver = new RejectETHRefundReceiver();
+        uint256 refundAmount = 0.1 ether;
+
+        vm.deal(address(routerHarness), refundAmount);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_ETHRefundFailed.selector)
+        );
+        rejectingReceiver.callRefundExcess(routerHarness, refundAmount);
+    }
+
+    /* =================================================== */
     /*              PATH VALIDATION TESTS                  */
     /* =================================================== */
 
@@ -1080,30 +935,5 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
     function test_slipstreamQuoter_returnsCorrectAddress() public view {
         assertEq(trustSwapRouter.slipstreamQuoter(), address(clQuoter));
-    }
-
-    /* =================================================== */
-    /*                   OWNERSHIP TESTS                   */
-    /* =================================================== */
-
-    function test_transferOwnership_successful() public {
-        address newOwner = makeAddr("newOwner");
-
-        vm.prank(owner);
-        trustSwapRouter.transferOwnership(newOwner);
-
-        assertEq(trustSwapRouter.pendingOwner(), newOwner);
-    }
-
-    function test_acceptOwnership_successful() public {
-        address newOwner = makeAddr("newOwner");
-
-        vm.prank(owner);
-        trustSwapRouter.transferOwnership(newOwner);
-
-        vm.prank(newOwner);
-        trustSwapRouter.acceptOwnership();
-
-        assertEq(trustSwapRouter.owner(), newOwner);
     }
 }

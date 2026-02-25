@@ -2,11 +2,8 @@
 pragma solidity 0.8.29;
 
 import { console2 } from "forge-std/src/console2.sol";
-import { Script } from "forge-std/src/Script.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { FinalityState } from "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol";
-import { RouterConfig } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
 import { TrustSwapAndBridgeRouter } from "contracts/TrustSwapAndBridgeRouter.sol";
 import { SetupScript } from "script/SetupScript.s.sol";
 
@@ -25,12 +22,12 @@ forge script script/base/DeployTrustSwapAndBridgeRouter.s.sol:DeployTrustSwapAnd
 */
 
 contract DeployTrustSwapAndBridgeRouter is SetupScript {
+    error UnsupportedChainId();
+    error RouterConfigMismatch();
+
     /* =================================================== */
     /*                   Config Constants                  */
     /* =================================================== */
-
-    // ===== Upgrades TimelockController Address =====
-    address public constant UPGRADES_TIMELOCK_CONTROLLER = 0x1E442BbB08c98100b18fa830a88E8A57b5dF9157;
 
     // ===== Base Mainnet MetaERC20Hub for Bridging =====
     address public constant BASE_MAINNET_META_ERC20_HUB = 0xE12aaF1529Ae21899029a9b51cca2F2Bc2cfC421;
@@ -45,15 +42,16 @@ contract DeployTrustSwapAndBridgeRouter is SetupScript {
     uint256 public constant BRIDGE_GAS_LIMIT = 100_000;
     FinalityState public constant BRIDGE_FINALITY_STATE = FinalityState.INSTANT;
 
-    /// @dev Deployed contracts
-    TrustSwapAndBridgeRouter public trustSwapAndBridgeRouterImplementation;
-    TransparentUpgradeableProxy public trustSwapAndBridgeRouterProxy;
+    /// @dev Deployed router contract
+    TrustSwapAndBridgeRouter public trustSwapAndBridgeRouter;
 
     function setUp() public override {
         super.setUp();
     }
 
     function run() public broadcast {
+        if (block.chainid != NETWORK_BASE) revert UnsupportedChainId();
+
         console2.log("");
         console2.log("DEPLOYMENTS: =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+");
 
@@ -61,8 +59,7 @@ contract DeployTrustSwapAndBridgeRouter is SetupScript {
 
         console2.log("");
         console2.log("DEPLOYMENT COMPLETE: =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+");
-        contractInfo("TrustSwapAndBridgeRouter Implementation", address(trustSwapAndBridgeRouterImplementation));
-        contractInfo("TrustSwapAndBridgeRouter Proxy", address(trustSwapAndBridgeRouterProxy));
+        contractInfo("TrustSwapAndBridgeRouter", address(trustSwapAndBridgeRouter));
     }
 
     /* =================================================== */
@@ -70,28 +67,18 @@ contract DeployTrustSwapAndBridgeRouter is SetupScript {
     /* =================================================== */
 
     function _deploy() internal {
-        // Deploy TrustSwapAndBridgeRouter implementation
-        trustSwapAndBridgeRouterImplementation = new TrustSwapAndBridgeRouter();
-        info("TrustSwapAndBridgeRouter Implementation", address(trustSwapAndBridgeRouterImplementation));
+        trustSwapAndBridgeRouter = new TrustSwapAndBridgeRouter();
+        _verifyDeployment(trustSwapAndBridgeRouter);
+        info("TrustSwapAndBridgeRouter", address(trustSwapAndBridgeRouter));
+    }
 
-        // Prepare router configuration
-        RouterConfig memory config = RouterConfig({
-            slipstreamSwapRouter: SLIPSTREAM_SWAP_ROUTER,
-            slipstreamFactory: SLIPSTREAM_FACTORY,
-            slipstreamQuoter: SLIPSTREAM_QUOTER,
-            metaERC20Hub: BASE_MAINNET_META_ERC20_HUB,
-            recipientDomain: INTUITION_MAINNET_DOMAIN,
-            bridgeGasLimit: BRIDGE_GAS_LIMIT,
-            finalityState: BRIDGE_FINALITY_STATE
-        });
-
-        // Prepare initialization data
-        bytes memory initData = abi.encodeWithSelector(TrustSwapAndBridgeRouter.initialize.selector, ADMIN, config);
-
-        // Deploy TrustSwapAndBridgeRouter proxy
-        trustSwapAndBridgeRouterProxy = new TransparentUpgradeableProxy(
-            address(trustSwapAndBridgeRouterImplementation), UPGRADES_TIMELOCK_CONTROLLER, initData
-        );
-        info("TrustSwapAndBridgeRouter Proxy", address(trustSwapAndBridgeRouterProxy));
+    function _verifyDeployment(TrustSwapAndBridgeRouter deployedRouter) internal view {
+        if (deployedRouter.slipstreamSwapRouter() != SLIPSTREAM_SWAP_ROUTER) revert RouterConfigMismatch();
+        if (address(deployedRouter.slipstreamFactory()) != SLIPSTREAM_FACTORY) revert RouterConfigMismatch();
+        if (deployedRouter.slipstreamQuoter() != SLIPSTREAM_QUOTER) revert RouterConfigMismatch();
+        if (address(deployedRouter.metaERC20Hub()) != BASE_MAINNET_META_ERC20_HUB) revert RouterConfigMismatch();
+        if (deployedRouter.recipientDomain() != INTUITION_MAINNET_DOMAIN) revert RouterConfigMismatch();
+        if (deployedRouter.bridgeGasLimit() != BRIDGE_GAS_LIMIT) revert RouterConfigMismatch();
+        if (deployedRouter.finalityState() != BRIDGE_FINALITY_STATE) revert RouterConfigMismatch();
     }
 }

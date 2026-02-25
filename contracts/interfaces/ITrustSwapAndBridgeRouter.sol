@@ -14,17 +14,6 @@ import { FinalityState, IMetaERC20Hub } from "contracts/interfaces/external/meta
  *         Metalayer.
  */
 
-/// @notice Configuration struct for router initialization
-struct RouterConfig {
-    address slipstreamSwapRouter;
-    address slipstreamFactory;
-    address slipstreamQuoter;
-    address metaERC20Hub;
-    uint32 recipientDomain;
-    uint256 bridgeGasLimit;
-    FinalityState finalityState;
-}
-
 interface ITrustSwapAndBridgeRouter {
     /* =================================================== */
     /*                       EVENTS                        */
@@ -69,48 +58,6 @@ interface ITrustSwapAndBridgeRouter {
      */
     event TrustBridged(address indexed user, uint256 trustAmount, bytes32 recipientAddress, bytes32 transferId);
 
-    /**
-     * @notice Emitted when the MetaERC20Hub address is updated
-     * @param newMetaERC20Hub The new MetaERC20Hub address
-     */
-    event MetaERC20HubSet(address indexed newMetaERC20Hub);
-
-    /**
-     * @notice Emitted when the recipient domain is updated
-     * @param newRecipientDomain The new recipient domain ID
-     */
-    event RecipientDomainSet(uint32 newRecipientDomain);
-
-    /**
-     * @notice Emitted when the bridge gas limit is updated
-     * @param newBridgeGasLimit The new bridge gas limit
-     */
-    event BridgeGasLimitSet(uint256 newBridgeGasLimit);
-
-    /**
-     * @notice Emitted when the finality state is updated
-     * @param newFinalityState The new finality state for bridging
-     */
-    event FinalityStateSet(FinalityState newFinalityState);
-
-    /**
-     * @notice Emitted when the Slipstream swap router is updated
-     * @param newSlipstreamSwapRouter The new Slipstream SwapRouter address
-     */
-    event SlipstreamSwapRouterSet(address indexed newSlipstreamSwapRouter);
-
-    /**
-     * @notice Emitted when the Slipstream factory is updated
-     * @param newSlipstreamFactory The new Slipstream CL Factory address
-     */
-    event SlipstreamFactorySet(address indexed newSlipstreamFactory);
-
-    /**
-     * @notice Emitted when the Slipstream quoter is updated
-     * @param newSlipstreamQuoter The new Slipstream CL Quoter address
-     */
-    event SlipstreamQuoterSet(address indexed newSlipstreamQuoter);
-
     /* =================================================== */
     /*                       ERRORS                        */
     /* =================================================== */
@@ -123,12 +70,6 @@ interface ITrustSwapAndBridgeRouter {
 
     /// @dev Thrown when insufficient ETH is provided for bridge fees
     error TrustSwapAndBridgeRouter_InsufficientBridgeFee();
-
-    /// @dev Thrown when an invalid recipient domain is provided
-    error TrustSwapAndBridgeRouter_InvalidRecipientDomain();
-
-    /// @dev Thrown when an invalid bridge gas limit is provided
-    error TrustSwapAndBridgeRouter_InvalidBridgeGasLimit();
 
     /// @dev Thrown when insufficient ETH is provided for swap and bridge
     error TrustSwapAndBridgeRouter_InsufficientETH();
@@ -154,19 +95,12 @@ interface ITrustSwapAndBridgeRouter {
     /// @dev Thrown when a pool referenced in the path does not exist in the CL factory
     error TrustSwapAndBridgeRouter_PoolDoesNotExist();
 
-    /// @dev Thrown when route path[0] doesn't match tokenIn
-    error TrustSwapAndBridgeRouter_TokenMismatch();
+    /// @dev Thrown when the ETH refund to the user fails after swap and bridge
+    error TrustSwapAndBridgeRouter_ETHRefundFailed();
 
     /* =================================================== */
-    /*                      FUNCTIONS                      */
+    /*                 SWAP FUNCTIONS                      */
     /* =================================================== */
-
-    /**
-     * @notice Initializes the TrustSwapAndBridgeRouter contract
-     * @param owner Owner address for the Ownable2StepUpgradeable
-     * @param config Router configuration struct containing all initialization parameters
-     */
-    function initialize(address owner, RouterConfig calldata config) external;
 
     /**
      * @notice Swaps ETH for TRUST using a pre-built Slipstream path and bridges to destination chain
@@ -219,6 +153,10 @@ interface ITrustSwapAndBridgeRouter {
      */
     function bridgeTrust(uint256 trustAmount, address recipient) external payable returns (bytes32 transferId);
 
+    /* =================================================== */
+    /*                 QUOTE FUNCTIONS                     */
+    /* =================================================== */
+
     /**
      * @notice Quotes the bridge fee for transferring TRUST to the destination chain
      * @param trustAmount The amount of TRUST to bridge (fee may be flat regardless of amount)
@@ -235,52 +173,6 @@ interface ITrustSwapAndBridgeRouter {
      * @return amountOut Expected output amount
      */
     function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut);
-
-    /* =================================================== */
-    /*                   ADMIN FUNCTIONS                   */
-    /* =================================================== */
-
-    /**
-     * @notice Updates the MetaERC20Hub contract address
-     * @param newMetaERC20Hub Address of the new MetaERC20Hub contract
-     */
-    function setMetaERC20Hub(address newMetaERC20Hub) external;
-
-    /**
-     * @notice Updates the recipient domain for bridging
-     * @param newRecipientDomain New recipient domain ID
-     */
-    function setRecipientDomain(uint32 newRecipientDomain) external;
-
-    /**
-     * @notice Updates the bridge gas limit
-     * @param newBridgeGasLimit New bridge gas limit
-     */
-    function setBridgeGasLimit(uint256 newBridgeGasLimit) external;
-
-    /**
-     * @notice Updates the finality state for bridging
-     * @param newFinalityState New finality state
-     */
-    function setFinalityState(FinalityState newFinalityState) external;
-
-    /**
-     * @notice Updates the Slipstream SwapRouter address
-     * @param newSlipstreamSwapRouter Address of the new Slipstream SwapRouter
-     */
-    function setSlipstreamSwapRouter(address newSlipstreamSwapRouter) external;
-
-    /**
-     * @notice Updates the Slipstream CL Factory address
-     * @param newSlipstreamFactory Address of the new Slipstream CL Factory
-     */
-    function setSlipstreamFactory(address newSlipstreamFactory) external;
-
-    /**
-     * @notice Updates the Slipstream CL Quoter address
-     * @param newSlipstreamQuoter Address of the new Slipstream CL Quoter
-     */
-    function setSlipstreamQuoter(address newSlipstreamQuoter) external;
 
     /* =================================================== */
     /*                   VIEW FUNCTIONS                    */

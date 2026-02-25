@@ -5,11 +5,9 @@ import { Test } from "forge-std/src/Test.sol";
 import { console2 } from "forge-std/src/console2.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { TrustSwapAndBridgeRouter } from "contracts/TrustSwapAndBridgeRouter.sol";
-import { ITrustSwapAndBridgeRouter, RouterConfig } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
-import { ICLFactory } from "contracts/interfaces/external/aerodrome/ICLFactory.sol";
+import { ITrustSwapAndBridgeRouter } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
 import { ICLQuoter } from "contracts/interfaces/external/aerodrome/ICLQuoter.sol";
 import { FinalityState, IMetaERC20Hub } from "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol";
 
@@ -36,8 +34,6 @@ contract TrustSwapAndBridgeRouterFork is Test {
 
     uint256 public constant FORK_BLOCK = 41_970_000;
 
-    uint32 public constant RECIPIENT_DOMAIN = 1155;
-    uint256 public constant BRIDGE_GAS_LIMIT = 100_000;
     uint256 public constant MOCK_BRIDGE_FEE = 0.001 ether;
     bytes32 public constant MOCK_TRANSFER_ID = keccak256("mock-transfer-id");
 
@@ -54,33 +50,21 @@ contract TrustSwapAndBridgeRouterFork is Test {
     /* =================================================== */
 
     TrustSwapAndBridgeRouter public router;
-    address public owner = address(0xABCD);
     address public user = address(0xBEEF);
     address public recipient = address(0xCAFE);
-    address public proxyAdmin = address(0xAD);
 
     function setUp() public {
         vm.createSelectFork("base", FORK_BLOCK);
 
-        // Deploy router implementation + proxy
-        TrustSwapAndBridgeRouter implementation = new TrustSwapAndBridgeRouter();
+        router = new TrustSwapAndBridgeRouter();
 
-        RouterConfig memory config = RouterConfig({
-            slipstreamSwapRouter: CL_SWAP_ROUTER,
-            slipstreamFactory: CL_FACTORY,
-            slipstreamQuoter: CL_QUOTER,
-            metaERC20Hub: META_ERC20_HUB,
-            recipientDomain: RECIPIENT_DOMAIN,
-            bridgeGasLimit: BRIDGE_GAS_LIMIT,
-            finalityState: FinalityState.INSTANT
-        });
-
-        bytes memory initData = abi.encodeWithSelector(TrustSwapAndBridgeRouter.initialize.selector, owner, config);
-
-        TransparentUpgradeableProxy proxy =
-            new TransparentUpgradeableProxy(address(implementation), proxyAdmin, initData);
-
-        router = TrustSwapAndBridgeRouter(payable(address(proxy)));
+        assertEq(router.slipstreamSwapRouter(), CL_SWAP_ROUTER, "Slipstream router mismatch");
+        assertEq(address(router.slipstreamFactory()), CL_FACTORY, "Slipstream factory mismatch");
+        assertEq(router.slipstreamQuoter(), CL_QUOTER, "Slipstream quoter mismatch");
+        assertEq(address(router.metaERC20Hub()), META_ERC20_HUB, "MetaERC20Hub mismatch");
+        assertEq(router.recipientDomain(), 1155, "Recipient domain mismatch");
+        assertEq(router.bridgeGasLimit(), 100_000, "Bridge gas limit mismatch");
+        assertEq(uint256(router.finalityState()), uint256(FinalityState.INSTANT), "Finality state mismatch");
 
         // Mock MetaERC20Hub.quoteTransferRemote → returns MOCK_BRIDGE_FEE
         vm.mockCall(
