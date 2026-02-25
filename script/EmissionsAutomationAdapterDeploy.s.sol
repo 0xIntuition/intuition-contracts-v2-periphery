@@ -10,14 +10,14 @@ import { SetupScript } from "script/SetupScript.s.sol";
 
 /*
 LOCAL
-forge script script/base/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
+forge script script/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
 --optimizer-runs 10000 \
 --rpc-url anvil \
 --broadcast \
 --slow
 
 TESTNET
-forge script script/base/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
+forge script script/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
 --optimizer-runs 10000 \
 --rpc-url base_sepolia \
 --broadcast \
@@ -29,7 +29,7 @@ forge script script/base/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomat
 --etherscan-api-key $ETHERSCAN_API_KEY
 
 MAINNET
-forge script script/base/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
+forge script script/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAdapterDeploy \
 --optimizer-runs 10000 \
 --rpc-url base \
 --broadcast \

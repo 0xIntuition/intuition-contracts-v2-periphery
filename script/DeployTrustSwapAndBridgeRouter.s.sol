@@ -9,7 +9,7 @@ import { SetupScript } from "script/SetupScript.s.sol";
 
 /*
 MAINNET (Base)
-forge script script/base/DeployTrustSwapAndBridgeRouter.s.sol:DeployTrustSwapAndBridgeRouter \
+forge script script/DeployTrustSwapAndBridgeRouter.s.sol:DeployTrustSwapAndBridgeRouter \
 --optimizer-runs 10000 \
 --rpc-url base \
 --broadcast \

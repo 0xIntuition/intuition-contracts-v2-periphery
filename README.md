@@ -130,7 +130,7 @@ This project is licensed under BUSL-1.1
 | Contract Name               | Address                                    | ProxyAdmin                                 |
 |-----------------------------|--------------------------------------------|--------------------------------------------|
 | EmissionsAutomationAdapter  | 0xb1ce9Ac324B5C3928736Ec33b5Fd741cb04a2F2d | /                                          |
-| TrustSwapAndBridgeRouter    | 0x                                         | /                                          |
+| TrustSwapAndBridgeRouter    | 0xA1EC6f95A88Bfc7A8Fd35f1296b64ebaf91C93fb | /                                          |
 
 ### Intuition Mainnet
 
