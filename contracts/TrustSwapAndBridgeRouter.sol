@@ -2,9 +2,7 @@
 pragma solidity 0.8.29;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { ICLFactory } from "contracts/interfaces/external/aerodrome/ICLFactory.sol";
@@ -12,7 +10,7 @@ import { ICLQuoter } from "contracts/interfaces/external/aerodrome/ICLQuoter.sol
 import { ISlipstreamSwapRouter } from "contracts/interfaces/external/aerodrome/ISlipstreamSwapRouter.sol";
 import { FinalityState, IMetaERC20Hub } from "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol";
 import { IWETH } from "contracts/interfaces/external/IWETH.sol";
-import { ITrustSwapAndBridgeRouter, RouterConfig } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
+import { ITrustSwapAndBridgeRouter } from "contracts/interfaces/ITrustSwapAndBridgeRouter.sol";
 
 /**
  * @title TrustSwapAndBridgeRouter
@@ -20,12 +18,7 @@ import { ITrustSwapAndBridgeRouter, RouterConfig } from "contracts/interfaces/IT
  * @notice Minimal router that validates pre-built Slipstream (CL) paths, delegates swaps to the
  *         Slipstream SwapRouter and bridges resulting TRUST to Intuition mainnet via Metalayer.
  */
-contract TrustSwapAndBridgeRouter is
-    ITrustSwapAndBridgeRouter,
-    Initializable,
-    Ownable2StepUpgradeable,
-    ReentrancyGuardUpgradeable
-{
+contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /* =================================================== */
@@ -50,96 +43,26 @@ contract TrustSwapAndBridgeRouter is
     /// @dev Size of an address in the packed path
     uint256 private constant ADDR_SIZE = 20;
 
-    /* =================================================== */
-    /*                   STATE VARIABLES                   */
-    /* =================================================== */
-
     /// @notice The single allowlisted Slipstream SwapRouter
-    address public slipstreamSwapRouter;
+    address public constant slipstreamSwapRouter = 0xcbBb8035cAc7D4B3Ca7aBb74cF7BdF900215Ce0D;
 
     /// @notice Slipstream CL Factory for pool existence verification
-    ICLFactory public slipstreamFactory;
+    ICLFactory public constant slipstreamFactory = ICLFactory(0xaDe65c38CD4849aDBA595a4323a8C7DdfE89716a);
 
     /// @notice Slipstream CL Quoter for swap quotes
-    address public slipstreamQuoter;
+    address public constant slipstreamQuoter = 0x3d4C22254F86f64B7eC90ab8F7aeC1FBFD271c6C;
 
     /// @notice MetaERC20Hub contract for cross-chain bridging
-    IMetaERC20Hub public metaERC20Hub;
+    IMetaERC20Hub public constant metaERC20Hub = IMetaERC20Hub(0xE12aaF1529Ae21899029a9b51cca2F2Bc2cfC421);
 
     /// @notice Recipient domain ID for bridging (Intuition mainnet)
-    uint32 public recipientDomain;
+    uint32 public constant recipientDomain = 1155;
 
     /// @notice Gas limit for bridge transactions
-    uint256 public bridgeGasLimit;
+    uint256 public constant bridgeGasLimit = 100_000;
 
     /// @notice Finality state for bridge transactions
-    FinalityState public finalityState;
-
-    /* =================================================== */
-    /*                     CONSTRUCTOR                     */
-    /* =================================================== */
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /* =================================================== */
-    /*                     INITIALIZER                     */
-    /* =================================================== */
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function initialize(address _owner, RouterConfig calldata config) external initializer {
-        __Ownable_init(_owner);
-        __ReentrancyGuard_init();
-
-        _setSlipstreamSwapRouter(config.slipstreamSwapRouter);
-        _setSlipstreamFactory(config.slipstreamFactory);
-        _setSlipstreamQuoter(config.slipstreamQuoter);
-        _setMetaERC20Hub(config.metaERC20Hub);
-        _setRecipientDomain(config.recipientDomain);
-        _setBridgeGasLimit(config.bridgeGasLimit);
-        _setFinalityState(config.finalityState);
-    }
-
-    /* =================================================== */
-    /*                   ADMIN FUNCTIONS                   */
-    /* =================================================== */
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setSlipstreamSwapRouter(address newSlipstreamSwapRouter) external onlyOwner {
-        _setSlipstreamSwapRouter(newSlipstreamSwapRouter);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setSlipstreamFactory(address newSlipstreamFactory) external onlyOwner {
-        _setSlipstreamFactory(newSlipstreamFactory);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setSlipstreamQuoter(address newSlipstreamQuoter) external onlyOwner {
-        _setSlipstreamQuoter(newSlipstreamQuoter);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setMetaERC20Hub(address newMetaERC20Hub) external onlyOwner {
-        _setMetaERC20Hub(newMetaERC20Hub);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setRecipientDomain(uint32 newRecipientDomain) external onlyOwner {
-        _setRecipientDomain(newRecipientDomain);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setBridgeGasLimit(uint256 newBridgeGasLimit) external onlyOwner {
-        _setBridgeGasLimit(newBridgeGasLimit);
-    }
-
-    /// @inheritdoc ITrustSwapAndBridgeRouter
-    function setFinalityState(FinalityState newFinalityState) external onlyOwner {
-        _setFinalityState(newFinalityState);
-    }
+    FinalityState public constant finalityState = FinalityState.INSTANT;
 
     /* =================================================== */
     /*                   SWAP FUNCTIONS                    */
@@ -157,10 +80,10 @@ contract TrustSwapAndBridgeRouter is
         returns (uint256 amountOut, bytes32 transferId)
     {
         if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
-        if (_extractFirstToken(path) != WETH_ADDRESS) {
+        if (_extractTokenAtOffset(path, 0) != WETH_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH();
         }
-        if (_extractLastToken(path) != TRUST_ADDRESS) {
+        if (_extractTokenAtOffset(path, path.length >= ADDR_SIZE ? path.length - ADDR_SIZE : 0) != TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST();
         }
 
@@ -213,10 +136,10 @@ contract TrustSwapAndBridgeRouter is
         if (tokenIn == address(0) || tokenIn == TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_InvalidToken();
         }
-        if (_extractFirstToken(path) != tokenIn) {
+        if (_extractTokenAtOffset(path, 0) != tokenIn) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithToken();
         }
-        if (_extractLastToken(path) != TRUST_ADDRESS) {
+        if (_extractTokenAtOffset(path, path.length >= ADDR_SIZE ? path.length - ADDR_SIZE : 0) != TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST();
         }
 
@@ -279,7 +202,7 @@ contract TrustSwapAndBridgeRouter is
     }
 
     /* =================================================== */
-    /*                   VIEW FUNCTIONS                    */
+    /*                   QUOTE FUNCTIONS                   */
     /* =================================================== */
 
     /// @inheritdoc ITrustSwapAndBridgeRouter
@@ -290,8 +213,6 @@ contract TrustSwapAndBridgeRouter is
 
     /// @inheritdoc ITrustSwapAndBridgeRouter
     function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut) {
-        if (slipstreamQuoter == address(0)) revert TrustSwapAndBridgeRouter_InvalidAddress();
-
         try ICLQuoter(slipstreamQuoter).quoteExactInput(path, amountIn) returns (
             uint256 quotedAmountOut, uint160[] memory, uint32[] memory, uint256
         ) {
@@ -310,25 +231,13 @@ contract TrustSwapAndBridgeRouter is
         formattedRecipientAddress = bytes32(uint256(uint160(recipient)));
     }
 
-    /**
-     * @dev Extracts the first token address from a packed Slipstream path.
-     *      Path format: token0 (20 bytes) | tickSpacing (3 bytes) | token1 (20 bytes) | ...
-     */
-    function _extractFirstToken(bytes calldata path) internal pure returns (address token) {
+    /// @dev Extracts a token address from a packed Slipstream path at a byte offset.
+    ///      Path format: token0 (20 bytes) | tickSpacing (3 bytes) | token1 (20 bytes) | ...
+    function _extractTokenAtOffset(bytes calldata path, uint256 offset) internal pure returns (address token) {
         if (path.length < MIN_PATH_LENGTH) revert TrustSwapAndBridgeRouter_InvalidPath();
+        if (offset > path.length - ADDR_SIZE) revert TrustSwapAndBridgeRouter_InvalidPath();
         assembly {
-            token := shr(96, calldataload(path.offset))
-        }
-    }
-
-    /**
-     * @dev Extracts the last token address from a packed Slipstream path.
-     *      The last 20 bytes of the path contain the final token address.
-     */
-    function _extractLastToken(bytes calldata path) internal pure returns (address token) {
-        if (path.length < MIN_PATH_LENGTH) revert TrustSwapAndBridgeRouter_InvalidPath();
-        assembly {
-            token := shr(96, calldataload(add(path.offset, sub(path.length, 20))))
+            token := shr(96, calldataload(add(path.offset, offset)))
         }
     }
 
@@ -363,6 +272,7 @@ contract TrustSwapAndBridgeRouter is
         }
     }
 
+    /// @dev Internal function to bridge TRUST to destination chain via Metalayer.
     function _bridgeTrust(
         uint256 amountOut,
         bytes32 recipientAddress,
@@ -378,55 +288,11 @@ contract TrustSwapAndBridgeRouter is
         );
     }
 
+    /// @dev Internal function to refund excess ETH to the user after deducting bridge fee.
     function _refundExcess(uint256 refundAmount) internal {
         if (refundAmount > 0) {
             (bool success,) = msg.sender.call{ value: refundAmount }("");
-            require(success, "ETH refund failed");
+            if (!success) revert TrustSwapAndBridgeRouter_ETHRefundFailed();
         }
-    }
-
-    /* =================================================== */
-    /*              INTERNAL ADMIN FUNCTIONS               */
-    /* =================================================== */
-
-    function _setSlipstreamSwapRouter(address newSlipstreamSwapRouter) internal {
-        if (newSlipstreamSwapRouter == address(0)) revert TrustSwapAndBridgeRouter_InvalidAddress();
-        slipstreamSwapRouter = newSlipstreamSwapRouter;
-        emit SlipstreamSwapRouterSet(newSlipstreamSwapRouter);
-    }
-
-    function _setSlipstreamFactory(address newSlipstreamFactory) internal {
-        if (newSlipstreamFactory == address(0)) revert TrustSwapAndBridgeRouter_InvalidAddress();
-        slipstreamFactory = ICLFactory(newSlipstreamFactory);
-        emit SlipstreamFactorySet(newSlipstreamFactory);
-    }
-
-    function _setSlipstreamQuoter(address newSlipstreamQuoter) internal {
-        if (newSlipstreamQuoter == address(0)) revert TrustSwapAndBridgeRouter_InvalidAddress();
-        slipstreamQuoter = newSlipstreamQuoter;
-        emit SlipstreamQuoterSet(newSlipstreamQuoter);
-    }
-
-    function _setMetaERC20Hub(address newMetaERC20Hub) internal {
-        if (newMetaERC20Hub == address(0)) revert TrustSwapAndBridgeRouter_InvalidAddress();
-        metaERC20Hub = IMetaERC20Hub(newMetaERC20Hub);
-        emit MetaERC20HubSet(newMetaERC20Hub);
-    }
-
-    function _setRecipientDomain(uint32 newRecipientDomain) internal {
-        if (newRecipientDomain == 0) revert TrustSwapAndBridgeRouter_InvalidRecipientDomain();
-        recipientDomain = newRecipientDomain;
-        emit RecipientDomainSet(newRecipientDomain);
-    }
-
-    function _setBridgeGasLimit(uint256 newBridgeGasLimit) internal {
-        if (newBridgeGasLimit == 0) revert TrustSwapAndBridgeRouter_InvalidBridgeGasLimit();
-        bridgeGasLimit = newBridgeGasLimit;
-        emit BridgeGasLimitSet(newBridgeGasLimit);
-    }
-
-    function _setFinalityState(FinalityState newFinalityState) internal {
-        finalityState = newFinalityState;
-        emit FinalityStateSet(newFinalityState);
     }
 }
