@@ -2,8 +2,6 @@
 pragma solidity 0.8.29;
 
 import { console2 } from "forge-std/src/console2.sol";
-import { Script } from "forge-std/src/Script.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { EmissionsAutomationAdapter } from "contracts/EmissionsAutomationAdapter.sol";
 import { SetupScript } from "script/SetupScript.s.sol";
@@ -42,16 +40,14 @@ forge script script/EmissionsAutomationAdapterDeploy.s.sol:EmissionsAutomationAd
 */
 
 contract EmissionsAutomationAdapterDeploy is SetupScript {
+    error EmissionsAutomationAdapterDeploymentMismatch();
+
     /* =================================================== */
     /*                   Config Constants                  */
     /* =================================================== */
 
-    // ===== Upgrades TimelockController Address =====
-    address public constant UPGRADES_TIMELOCK_CONTROLLER = 0x1E442BbB08c98100b18fa830a88E8A57b5dF9157;
-
-    /// @dev Deployed contracts
-    EmissionsAutomationAdapter public emissionsAutomationAdapterImplementation;
-    TransparentUpgradeableProxy public emissionsAutomationAdapterProxy;
+    /// @dev Deployed adapter contract
+    EmissionsAutomationAdapter public emissionsAutomationAdapter;
 
     /// @notice Address of the BaseEmissionsController contract
     address public BASE_EMISSIONS_CONTROLLER;
@@ -78,8 +74,7 @@ contract EmissionsAutomationAdapterDeploy is SetupScript {
 
         console2.log("");
         console2.log("DEPLOYMENT COMPLETE: =+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+");
-        contractInfo("EmissionsAutomationAdapter Implementation", address(emissionsAutomationAdapterImplementation));
-        contractInfo("EmissionsAutomationAdapter Proxy", address(emissionsAutomationAdapterProxy));
+        contractInfo("EmissionsAutomationAdapter", address(emissionsAutomationAdapter));
     }
 
     /* =================================================== */
@@ -87,18 +82,17 @@ contract EmissionsAutomationAdapterDeploy is SetupScript {
     /* =================================================== */
 
     function _deploy() internal {
-        // Deploy EmissionsAutomationAdapter implementation
-        emissionsAutomationAdapterImplementation = new EmissionsAutomationAdapter();
-        info("EmissionsAutomationAdapter Implementation", address(emissionsAutomationAdapterImplementation));
+        emissionsAutomationAdapter = new EmissionsAutomationAdapter(ADMIN, BASE_EMISSIONS_CONTROLLER);
+        _verifyDeployment(emissionsAutomationAdapter);
+        info("EmissionsAutomationAdapter", address(emissionsAutomationAdapter));
+    }
 
-        // Prepare initialization data
-        bytes memory initData =
-            abi.encodeWithSelector(EmissionsAutomationAdapter.initialize.selector, ADMIN, BASE_EMISSIONS_CONTROLLER);
-
-        // Deploy EmissionsAutomationAdapter proxy
-        emissionsAutomationAdapterProxy = new TransparentUpgradeableProxy(
-            address(emissionsAutomationAdapterImplementation), UPGRADES_TIMELOCK_CONTROLLER, initData
-        );
-        info("EmissionsAutomationAdapter Proxy", address(emissionsAutomationAdapterProxy));
+    function _verifyDeployment(EmissionsAutomationAdapter deployedAdapter) internal view {
+        if (address(deployedAdapter.baseEmissionsController()) != BASE_EMISSIONS_CONTROLLER) {
+            revert EmissionsAutomationAdapterDeploymentMismatch();
+        }
+        if (!deployedAdapter.hasRole(deployedAdapter.DEFAULT_ADMIN_ROLE(), ADMIN)) {
+            revert EmissionsAutomationAdapterDeploymentMismatch();
+        }
     }
 }
