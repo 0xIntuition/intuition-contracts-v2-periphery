@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.29;
 
-import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import { ReentrancyGuardUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {
     AutomationCompatibleInterface
@@ -17,13 +16,7 @@ import { ICoreEmissionsController } from "intuition-contracts-v2/interfaces/ICor
  * @author 0xIntuition
  * @notice A contract that integrates with keepers to automate the minting and bridging of emissions
  */
-contract EmissionsAutomationAdapter is
-    Initializable,
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable,
-    AutomationCompatibleInterface
-{
+contract EmissionsAutomationAdapter is AccessControl, ReentrancyGuard, Pausable, AutomationCompatibleInterface {
     /* =================================================== */
     /*                     CONSTANTS                       */
     /* =================================================== */
@@ -32,11 +25,11 @@ contract EmissionsAutomationAdapter is
     bytes32 public constant UPKEEP_ROLE = keccak256("UPKEEP_ROLE");
 
     /* =================================================== */
-    /*                  STATE VARIABLES                    */
+    /*                    IMMUTABLES                       */
     /* =================================================== */
 
     /// @notice Reference to the BaseEmissionsController contract
-    IBaseEmissionsController public baseEmissionsController;
+    IBaseEmissionsController public immutable baseEmissionsController;
 
     /* =================================================== */
     /*                      EVENTS                         */
@@ -61,27 +54,14 @@ contract EmissionsAutomationAdapter is
     /*                 CONSTRUCTOR                         */
     /* =================================================== */
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /* =================================================== */
-    /*                    INITIALIZER                      */
-    /* =================================================== */
-
     /**
-     * @notice Initializes the EmissionsAutomationAdapter
+     * @notice Constructor for the EmissionsAutomationAdapter
      * @param _admin The address of the admin
      * @param _baseEmissionsController The address of the BaseEmissionsController contract
      */
-    function initialize(address _admin, address _baseEmissionsController) external initializer {
+    constructor(address _admin, address _baseEmissionsController) {
         if (_admin == address(0)) revert EmissionsAutomationAdapter_InvalidAddress();
         if (_baseEmissionsController == address(0)) revert EmissionsAutomationAdapter_InvalidAddress();
-
-        __AccessControl_init();
-        __ReentrancyGuard_init();
-        __Pausable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         baseEmissionsController = IBaseEmissionsController(_baseEmissionsController);
@@ -91,14 +71,6 @@ contract EmissionsAutomationAdapter is
     /* =================================================== */
     /*                  ADMIN FUNCTIONS                    */
     /* =================================================== */
-
-    /// @notice Updates the BaseEmissionsController contract address
-    /// @param _controller The new BaseEmissionsController address
-    function setBaseEmissionsController(address _controller) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_controller == address(0)) revert EmissionsAutomationAdapter_InvalidAddress();
-        baseEmissionsController = IBaseEmissionsController(_controller);
-        emit BaseEmissionsControllerSet(_controller);
-    }
 
     /// @notice Pauses the contract, preventing performUpkeep from executing
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -152,7 +124,7 @@ contract EmissionsAutomationAdapter is
 
     /// @notice Internal function to mint and bridge emissions for the current epoch if needed
     function _mintAndBridgeCurrentEpochIfNeeded() internal {
-        uint256 currentEpoch = ICoreEmissionsController(address(baseEmissionsController)).getCurrentEpoch();
+        uint256 currentEpoch = _getCurrentEpoch();
         if (baseEmissionsController.getEpochMintedAmount(currentEpoch) != 0) return;
 
         baseEmissionsController.mintAndBridgeCurrentEpoch();
@@ -161,7 +133,12 @@ contract EmissionsAutomationAdapter is
 
     /// @notice Internal function to determine if minting is needed for the current epoch
     function _shouldMint() internal view returns (bool) {
-        uint256 currentEpoch = ICoreEmissionsController(address(baseEmissionsController)).getCurrentEpoch();
+        uint256 currentEpoch = _getCurrentEpoch();
         return baseEmissionsController.getEpochMintedAmount(currentEpoch) == 0;
+    }
+
+    /// @notice Internal function to get the current epoch number from the BaseEmissionsController
+    function _getCurrentEpoch() internal view returns (uint256) {
+        return ICoreEmissionsController(address(baseEmissionsController)).getCurrentEpoch();
     }
 }
