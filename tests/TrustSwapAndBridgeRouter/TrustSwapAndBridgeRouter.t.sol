@@ -110,6 +110,11 @@ contract MockSlipstreamSwapRouter {
 
         IERC20(tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
         MockERC20(tokenOut).mint(params.recipient, amountOut);
+
+        if (address(this).balance > 0) {
+            (bool success,) = msg.sender.call{ value: address(this).balance }("");
+            require(success, "STE");
+        }
     }
 }
 
@@ -377,6 +382,24 @@ contract TrustSwapAndBridgeRouterTest is Test {
         assertEq(amountOut, expectedOutput);
     }
 
+    function test_swapAndBridgeWithETH_handlesDownstreamRefundEthDust() public {
+        uint256 ethAmountForSwap = 1 ether;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 totalEth = ethAmountForSwap + bridgeFee;
+        uint256 expectedOutput = ethAmountForSwap * DEFAULT_OUTPUT_MULTIPLIER;
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.deal(address(swapRouter), 1);
+        vm.deal(user, totalEth);
+
+        vm.prank(user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user);
+
+        assertEq(amountOut, expectedOutput);
+        assertEq(address(swapRouter).balance, 0);
+        assertEq(address(trustSwapRouter).balance, 1);
+    }
+
     function test_swapAndBridgeWithETH_emitsEvent() public {
         uint256 ethAmountForSwap = 1 ether;
         uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
@@ -590,6 +613,25 @@ contract TrustSwapAndBridgeRouterTest is Test {
         trustSwapRouter.swapAndBridgeWithERC20{ value: totalETH }(BASE_MAINNET_USDC, amountIn, path, 0, user);
 
         assertEq(user.balance, userEthBefore - bridgeFee);
+    }
+
+    function test_swapAndBridgeWithERC20_handlesDownstreamRefundEthDust() public {
+        uint256 amountIn = 100e6;
+        uint256 expectedOutput = amountIn * DEFAULT_OUTPUT_MULTIPLIER;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.deal(address(swapRouter), 1);
+        vm.deal(user, bridgeFee);
+
+        vm.prank(user);
+        (uint256 amountOut,) =
+            trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 0, user);
+
+        assertEq(amountOut, expectedOutput);
+        assertEq(address(swapRouter).balance, 0);
+        assertEq(address(trustSwapRouter).balance, 1);
     }
 
     function test_swapAndBridgeWithERC20_revertsOnZeroRecipient() public {
