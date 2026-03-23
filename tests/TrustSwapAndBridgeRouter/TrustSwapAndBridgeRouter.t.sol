@@ -97,7 +97,11 @@ contract MockSlipstreamSwapRouter {
         shouldFail = fail;
     }
 
-    function exactInput(ISlipstreamSwapRouter.ExactInputParams calldata params) external returns (uint256 amountOut) {
+    function exactInput(ISlipstreamSwapRouter.ExactInputParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut)
+    {
         require(!shouldFail, "MockSlipstreamSwapRouter: swap failed");
 
         amountOut = params.amountIn * outputMultiplier;
