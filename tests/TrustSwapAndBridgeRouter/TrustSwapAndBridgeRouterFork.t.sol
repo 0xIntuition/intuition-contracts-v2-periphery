@@ -335,6 +335,65 @@ contract TrustSwapAndBridgeRouterFork is Test {
     }
 
     /* =================================================== */
+    /*        RECEIVE() DUST ACCEPTANCE (FORK)             */
+    /* =================================================== */
+
+    /// @notice Verifies the router can receive ETH dust refunds from the Slipstream SwapRouter
+    ///         during a swapAndBridgeWithETH call. The receive() function must accept ETH
+    ///         sent back by the swap router's internal refundETH path.
+    function test_fork_swapAndBridgeWithETH_routerAcceptsSwapDust() external {
+        bytes memory path = abi.encodePacked(WETH, TS_WETH_USDC, USDC, TS_USDC_TRUST, TRUST);
+
+        uint256 swapEth = 0.01 ether;
+        uint256 totalValue = swapEth + MOCK_BRIDGE_FEE;
+
+        // Force deterministic non-zero refund path from Slipstream router.
+        vm.deal(CL_SWAP_ROUTER, 1 wei);
+        uint256 routerEthBefore = address(router).balance;
+
+        vm.prank(user);
+        (uint256 amountOut,) = router.swapAndBridgeWithETH{ value: totalValue }(path, 0, recipient);
+
+        assertGt(amountOut, 0, "Should receive TRUST from swap");
+
+        // The router's ETH balance captures any dust refunded by the SwapRouter.
+        // In the swapAndBridgeWithETH path, there is no explicit _refundExcess call
+        // for swap dust — the receive() function silently accepts it.
+        uint256 routerEthAfter = address(router).balance;
+
+        // The key assertion: the router balance should strictly increase,
+        // proving receive() accepted a non-zero refund without reverting.
+        assertGt(routerEthAfter, routerEthBefore, "Router should capture ETH dust from swap");
+        assertEq(CL_SWAP_ROUTER.balance, 0, "SwapRouter dust should be refunded out");
+
+        console2.log("Router ETH dust captured: %d wei", routerEthAfter - routerEthBefore);
+    }
+
+    /// @notice Reproduces the original sweepToken contamination path (S-324):
+    ///         attacker sends 1 wei into Slipstream SwapRouter via payable sweepToken, then a user swap
+    ///         must still succeed because this router now accepts refundETH callbacks via receive().
+    function test_fork_swapAndBridgeWithETH_sweepTokenDustDoesNotDos() external {
+        bytes memory path = abi.encodePacked(WETH, TS_WETH_USDC, USDC, TS_USDC_TRUST, TRUST);
+        uint256 swapEth = 0.01 ether;
+        uint256 totalValue = swapEth + MOCK_BRIDGE_FEE;
+        address attacker = makeAddr("attacker");
+
+        vm.deal(attacker, 1 ether);
+        vm.prank(attacker);
+        (bool ok,) = CL_SWAP_ROUTER.call{ value: 1 wei }(
+            abi.encodeWithSignature("sweepToken(address,uint256,address)", TRUST, 0, attacker)
+        );
+        assertTrue(ok, "sweepToken contamination call should succeed");
+        assertEq(CL_SWAP_ROUTER.balance, 1 wei, "SwapRouter should hold 1 wei before swap");
+
+        vm.prank(user);
+        (uint256 amountOut,) = router.swapAndBridgeWithETH{ value: totalValue }(path, 0, recipient);
+
+        assertGt(amountOut, 0, "Swap should still succeed after contamination");
+        assertEq(CL_SWAP_ROUTER.balance, 0, "refundETH should clear SwapRouter ETH dust");
+    }
+
+    /* =================================================== */
     /*                POOL VALIDATION (FORK)               */
     /* =================================================== */
 

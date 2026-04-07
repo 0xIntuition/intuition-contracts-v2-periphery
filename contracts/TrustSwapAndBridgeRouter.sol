@@ -64,6 +64,9 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
     /// @notice Finality state for bridge transactions
     FinalityState public constant finalityState = FinalityState.INSTANT;
 
+    /// @notice Accepts ETH refunds from downstream swap router calls (e.g. refundETH in exactInput).
+    receive() external payable { }
+
     /* =================================================== */
     /*                   SWAP FUNCTIONS                    */
     /* =================================================== */
