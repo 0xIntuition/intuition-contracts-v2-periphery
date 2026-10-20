@@ -96,7 +96,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
         uint256 routerTrustBefore = IERC20(TRUST).balanceOf(address(router));
 
         vm.prank(user);
-        (uint256 amountOut, bytes32 transferId) = router.swapAndBridgeWithETH{ value: totalValue }(path, 0, recipient);
+        (uint256 amountOut, bytes32 transferId) =
+            router.swapAndBridgeWithETH{ value: totalValue }(path, 1, recipient, block.timestamp + 1 hours);
 
         assertGt(amountOut, 0, "Should receive TRUST from swap");
         assertEq(transferId, MOCK_TRANSFER_ID, "Transfer ID should match mock");
@@ -123,7 +124,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
         uint256 minTrustOut = (expectedOut * 99) / 100;
 
         vm.prank(user);
-        (uint256 amountOut,) = router.swapAndBridgeWithETH{ value: totalValue }(path, minTrustOut, recipient);
+        (uint256 amountOut,) =
+            router.swapAndBridgeWithETH{ value: totalValue }(path, minTrustOut, recipient, block.timestamp + 1 hours);
 
         assertGe(amountOut, minTrustOut, "Output should meet minimum");
 
@@ -146,8 +148,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
         vm.startPrank(user);
         IERC20(USDC).approve(address(router), amountIn);
 
-        (uint256 amountOut, bytes32 transferId) =
-            router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(USDC, amountIn, path, 0, recipient);
+        (uint256 amountOut, bytes32 transferId) = router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(
+            USDC, amountIn, path, 1, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
 
         assertGt(amountOut, 0, "Should receive TRUST from swap");
@@ -175,8 +178,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
         vm.startPrank(user);
         IERC20(USDC).approve(address(router), amountIn);
 
-        (uint256 amountOut,) =
-            router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(USDC, amountIn, path, minTrustOut, recipient);
+        (uint256 amountOut,) = router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(
+            USDC, amountIn, path, minTrustOut, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
 
         assertGe(amountOut, minTrustOut, "Output should meet minimum");
@@ -197,8 +201,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
         vm.startPrank(user);
         IERC20(DAI).approve(address(router), amountIn);
 
-        (uint256 amountOut, bytes32 transferId) =
-            router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(DAI, amountIn, path, 0, recipient);
+        (uint256 amountOut, bytes32 transferId) = router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(
+            DAI, amountIn, path, 1, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
 
         assertGt(amountOut, 0, "Should receive TRUST from swap");
@@ -225,8 +230,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
         vm.startPrank(user);
         IERC20(DAI).approve(address(router), amountIn);
 
-        (uint256 amountOut,) =
-            router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(DAI, amountIn, path, minTrustOut, recipient);
+        (uint256 amountOut,) = router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(
+            DAI, amountIn, path, minTrustOut, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
 
         assertGe(amountOut, minTrustOut, "Output should meet minimum");
@@ -290,7 +296,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
     function test_fork_quoteExactInput_singleHop() external {
         bytes memory path = abi.encodePacked(USDC, TS_USDC_TRUST, TRUST);
 
-        uint256 quotedAmount = router.quoteExactInput(path, 10e6);
+        (uint256 quotedAmount, bool success) = router.quoteExactInput(path, 10e6);
+        assertTrue(success, "Quote should succeed for valid path");
         assertGt(quotedAmount, 0, "Quote should return non-zero for valid path");
 
         console2.log("QuoteExactInput: 10 USDC ->", quotedAmount, "TRUST");
@@ -299,7 +306,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
     function test_fork_quoteExactInput_multiHop() external {
         bytes memory path = abi.encodePacked(WETH, TS_WETH_USDC, USDC, TS_USDC_TRUST, TRUST);
 
-        uint256 quotedAmount = router.quoteExactInput(path, 0.01 ether);
+        (uint256 quotedAmount, bool success) = router.quoteExactInput(path, 0.01 ether);
+        assertTrue(success, "Quote should succeed for valid multi-hop path");
         assertGt(quotedAmount, 0, "Quote should return non-zero for valid multi-hop path");
 
         console2.log("QuoteExactInput: 0.01 ETH ->", quotedAmount, "TRUST");
@@ -327,7 +335,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
 
         vm.startPrank(user);
         IERC20(USDC).approve(address(router), amountIn);
-        router.swapAndBridgeWithERC20{ value: totalValue }(USDC, amountIn, path, 0, recipient);
+        router.swapAndBridgeWithERC20{ value: totalValue }(
+            USDC, amountIn, path, 1, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
 
         uint256 userEthAfter = user.balance;
@@ -352,7 +362,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
         uint256 routerEthBefore = address(router).balance;
 
         vm.prank(user);
-        (uint256 amountOut,) = router.swapAndBridgeWithETH{ value: totalValue }(path, 0, recipient);
+        (uint256 amountOut,) =
+            router.swapAndBridgeWithETH{ value: totalValue }(path, 1, recipient, block.timestamp + 1 hours);
 
         assertGt(amountOut, 0, "Should receive TRUST from swap");
 
@@ -387,7 +398,8 @@ contract TrustSwapAndBridgeRouterFork is Test {
         assertEq(CL_SWAP_ROUTER.balance, 1 wei, "SwapRouter should hold 1 wei before swap");
 
         vm.prank(user);
-        (uint256 amountOut,) = router.swapAndBridgeWithETH{ value: totalValue }(path, 0, recipient);
+        (uint256 amountOut,) =
+            router.swapAndBridgeWithETH{ value: totalValue }(path, 1, recipient, block.timestamp + 1 hours);
 
         assertGt(amountOut, 0, "Swap should still succeed after contamination");
         assertEq(CL_SWAP_ROUTER.balance, 0, "refundETH should clear SwapRouter ETH dust");
@@ -409,7 +421,9 @@ contract TrustSwapAndBridgeRouterFork is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PoolDoesNotExist.selector)
         );
-        router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(USDC, 1e6, badPath, 0, recipient);
+        router.swapAndBridgeWithERC20{ value: MOCK_BRIDGE_FEE }(
+            USDC, 1e6, badPath, 1, recipient, block.timestamp + 1 hours
+        );
         vm.stopPrank();
     }
 }

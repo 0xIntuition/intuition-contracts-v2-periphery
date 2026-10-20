@@ -361,8 +361,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, totalEth);
 
         vm.prank(user);
-        (uint256 amountOut, bytes32 transferId) =
-            trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user);
+        (uint256 amountOut, bytes32 transferId) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(
+            path, expectedOutput, user, block.timestamp + 1 hours
+        );
 
         assertEq(amountOut, expectedOutput);
         assertTrue(transferId != bytes32(0));
@@ -381,7 +382,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, totalEth);
 
         vm.prank(user);
-        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(
+            path, expectedOutput, user, block.timestamp + 1 hours
+        );
 
         assertEq(amountOut, expectedOutput);
     }
@@ -397,7 +400,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, totalEth);
 
         vm.prank(user);
-        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(
+            path, expectedOutput, user, block.timestamp + 1 hours
+        );
 
         assertEq(amountOut, expectedOutput);
         assertEq(address(swapRouter).balance, 0);
@@ -420,7 +425,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         );
 
         vm.prank(user);
-        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, expectedOutput, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnInsufficientETH() public {
@@ -433,7 +438,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InsufficientETH.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH{ value: bridgeFee }(path, 1, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: bridgeFee }(path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnZeroRecipient() public {
@@ -448,7 +453,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipient.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 0, address(0));
+        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 1, address(0), block.timestamp + 1 hours);
         vm.stopPrank();
     }
 
@@ -459,7 +464,17 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InsufficientETH.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH(path, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH(path, 1, user, block.timestamp + 1 hours);
+    }
+
+    function test_swapAndBridgeWithETH_revertsOnZeroMinTrustOut() public {
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_MinTrustOutZero.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithETH(path, 0, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnPathNotStartingWithWETH() public {
@@ -472,7 +487,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnPathNotEndingWithTRUST() public {
@@ -485,7 +500,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnPoolDoesNotExist() public {
@@ -500,7 +515,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PoolDoesNotExist.selector)
         );
-        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithETH_revertsOnInvalidPathLength() public {
@@ -511,7 +526,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, 1 ether + bridgeFee);
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
-        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(path, 1, user, block.timestamp + 1 hours);
     }
 
     function testFuzz_swapAndBridgeWithETH(uint256 ethAmount) public {
@@ -525,9 +540,69 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, totalEth);
 
         vm.prank(user);
-        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 0, user);
+        (uint256 amountOut,) =
+            trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 1, user, block.timestamp + 1 hours);
 
         assertEq(amountOut, ethAmount * DEFAULT_OUTPUT_MULTIPLIER);
+    }
+
+    function test_swapAndBridgeWithETH_revertsOnExpiredDeadline() public {
+        uint256 ethAmountForSwap = 1 ether;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 totalEth = ethAmountForSwap + bridgeFee;
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.deal(user, totalEth);
+
+        // Warp forward so we can supply a deadline strictly in the past.
+        vm.warp(block.timestamp + 10 minutes);
+        uint256 expiredDeadline = block.timestamp - 1;
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_DeadlineExpired.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 1, user, expiredDeadline);
+        vm.stopPrank();
+    }
+
+    function test_swapAndBridgeWithETH_succeedsOnCurrentBlockDeadline() public {
+        // Boundary: deadline == block.timestamp must succeed (Uniswap V3
+        // convention is `<=`; we mirror it as `deadline >= block.timestamp`).
+        uint256 ethAmountForSwap = 1 ether;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 totalEth = ethAmountForSwap + bridgeFee;
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.deal(user, totalEth);
+
+        vm.startPrank(user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 1, user, block.timestamp);
+        vm.stopPrank();
+
+        assertEq(amountOut, ethAmountForSwap * DEFAULT_OUTPUT_MULTIPLIER);
+    }
+
+    function test_swapAndBridgeWithETH_warpPastDeadline_revertsAtEntryCheck() public {
+        // Confirms our entry-level check fires before reaching Slipstream:
+        // the revert reason must be our clean custom error, not whatever
+        // Slipstream surfaces for a stale deadline.
+        uint256 ethAmountForSwap = 1 ether;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        uint256 totalEth = ethAmountForSwap + bridgeFee;
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_WETH, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.deal(user, totalEth);
+
+        uint256 deadline = block.timestamp + 5 minutes;
+        vm.warp(deadline + 1);
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_DeadlineExpired.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithETH{ value: totalEth }(path, 1, user, deadline);
+        vm.stopPrank();
     }
 
     /* =================================================== */
@@ -547,7 +622,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
-            BASE_MAINNET_USDC, amountIn, path, expectedOutput, user
+            BASE_MAINNET_USDC, amountIn, path, expectedOutput, user, block.timestamp + 1 hours
         );
 
         assertEq(amountOut, expectedOutput);
@@ -575,7 +650,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
-            address(tokenA), amountIn, path, expectedOutput, user
+            address(tokenA), amountIn, path, expectedOutput, user, block.timestamp + 1 hours
         );
 
         assertEq(amountOut, expectedOutput);
@@ -597,7 +672,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
-            BASE_MAINNET_USDC, amountIn, path, expectedOutput, user
+            BASE_MAINNET_USDC, amountIn, path, expectedOutput, user, block.timestamp + 1 hours
         );
     }
 
@@ -614,7 +689,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         uint256 userEthBefore = user.balance;
 
         vm.prank(user);
-        trustSwapRouter.swapAndBridgeWithERC20{ value: totalETH }(BASE_MAINNET_USDC, amountIn, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: totalETH }(
+            BASE_MAINNET_USDC, amountIn, path, 1, user, block.timestamp + 1 hours
+        );
 
         assertEq(user.balance, userEthBefore - bridgeFee);
     }
@@ -630,8 +707,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, bridgeFee);
 
         vm.prank(user);
-        (uint256 amountOut,) =
-            trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 0, user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, amountIn, path, 1, user, block.timestamp + 1 hours
+        );
 
         assertEq(amountOut, expectedOutput);
         assertEq(address(swapRouter).balance, 0);
@@ -649,7 +727,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidRecipient.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 0, address(0));
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, amountIn, path, 1, address(0), block.timestamp + 1 hours
+        );
         vm.stopPrank();
     }
 
@@ -660,7 +740,17 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_AmountInZero.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_USDC, 0, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_USDC, 0, path, 1, user, block.timestamp + 1 hours);
+    }
+
+    function test_swapAndBridgeWithERC20_revertsOnZeroMinTrustOut() public {
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_MinTrustOutZero.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_USDC, 100e6, path, 0, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithERC20_revertsOnInvalidTokenZeroAddress() public {
@@ -670,7 +760,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidToken.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20(address(0), 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20(address(0), 100e6, path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithERC20_revertsOnInvalidTokenTRUST() public {
@@ -680,7 +770,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidToken.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_TRUST, 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_TRUST, 100e6, path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithERC20_revertsOnPathTokenMismatch() public {
@@ -695,7 +785,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
                 ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PathDoesNotStartWithToken.selector
             )
         );
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, 100e6, path, 1, user, block.timestamp + 1 hours
+        );
     }
 
     function test_swapAndBridgeWithERC20_revertsOnPathNotEndingWithTRUST() public {
@@ -708,7 +800,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PathDoesNotEndWithTRUST.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, 100e6, path, 1, user, block.timestamp + 1 hours
+        );
     }
 
     function test_swapAndBridgeWithERC20_revertsOnPoolDoesNotExist() public {
@@ -723,7 +817,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_PoolDoesNotExist.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, 100e6, path, 1, user, block.timestamp + 1 hours
+        );
     }
 
     function test_swapAndBridgeWithERC20_revertsOnInsufficientBridgeFee() public {
@@ -735,7 +831,7 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InsufficientBridgeFee.selector)
         );
-        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_USDC, amountIn, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20(BASE_MAINNET_USDC, amountIn, path, 1, user, block.timestamp + 1 hours);
     }
 
     function test_swapAndBridgeWithERC20_revertsOnInvalidPathLength() public {
@@ -746,7 +842,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, 100e6, path, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, 100e6, path, 1, user, block.timestamp + 1 hours
+        );
     }
 
     function testFuzz_swapAndBridgeWithERC20(uint256 amountIn) public {
@@ -760,10 +858,77 @@ contract TrustSwapAndBridgeRouterTest is Test {
         vm.deal(user, bridgeFee);
 
         vm.prank(user);
-        (uint256 amountOut,) =
-            trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 0, user);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, amountIn, path, 1, user, block.timestamp + 1 hours
+        );
 
         assertEq(amountOut, amountIn * DEFAULT_OUTPUT_MULTIPLIER);
+    }
+
+    function test_swapAndBridgeWithERC20_revertsOnExpiredDeadline() public {
+        uint256 amountIn = 100e6;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        usdcToken.mint(user, amountIn);
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+        usdcToken.approve(address(trustSwapRouter), amountIn);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 10 minutes);
+        uint256 expiredDeadline = block.timestamp - 1;
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_DeadlineExpired.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, amountIn, path, 1, user, expiredDeadline
+        );
+        vm.stopPrank();
+    }
+
+    function test_swapAndBridgeWithERC20_succeedsOnCurrentBlockDeadline() public {
+        uint256 amountIn = 100e6;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        usdcToken.mint(user, amountIn);
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+        usdcToken.approve(address(trustSwapRouter), amountIn);
+        (uint256 amountOut,) = trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, amountIn, path, 1, user, block.timestamp
+        );
+        vm.stopPrank();
+
+        assertEq(amountOut, amountIn * DEFAULT_OUTPUT_MULTIPLIER);
+    }
+
+    function test_swapAndBridgeWithERC20_warpPastDeadline_revertsAtEntryCheck() public {
+        uint256 amountIn = 100e6;
+        uint256 bridgeFee = metaERC20Hub.BRIDGE_FEE();
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        usdcToken.mint(user, amountIn);
+        vm.deal(user, bridgeFee);
+
+        vm.startPrank(user);
+        usdcToken.approve(address(trustSwapRouter), amountIn);
+        vm.stopPrank();
+
+        uint256 deadline = block.timestamp + 5 minutes;
+        vm.warp(deadline + 1);
+
+        vm.startPrank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_DeadlineExpired.selector)
+        );
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, amountIn, path, 1, user, deadline);
+        vm.stopPrank();
     }
 
     /* =================================================== */
@@ -885,9 +1050,10 @@ contract TrustSwapAndBridgeRouterTest is Test {
         uint256 amountIn = 100e6;
         bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
 
-        uint256 amountOut = trustSwapRouter.quoteExactInput(path, amountIn);
+        (uint256 amountOut, bool success) = trustSwapRouter.quoteExactInput(path, amountIn);
 
         assertEq(amountOut, amountIn * DEFAULT_OUTPUT_MULTIPLIER);
+        assertTrue(success, "success flag must be true on a successful quote");
     }
 
     function test_quoteExactInput_returnsZeroOnFailure() public {
@@ -896,9 +1062,45 @@ contract TrustSwapAndBridgeRouterTest is Test {
         uint256 amountIn = 100e6;
         bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
 
-        uint256 amountOut = trustSwapRouter.quoteExactInput(path, amountIn);
+        (uint256 amountOut, bool success) = trustSwapRouter.quoteExactInput(path, amountIn);
 
         assertEq(amountOut, 0);
+        assertFalse(success, "success flag must be false when the quoter reverts");
+    }
+
+    function test_quoteExactInput_distinguishesZeroQuoteFromFailure() public {
+        // A legitimate zero-output quote (e.g. amountIn = 0) must report
+        // success = true. Frontends that consume this view must branch on
+        // success — treating success=false as a zero-quote collapses
+        // downstream slippage protection. See L-1 audit follow-up.
+        bytes memory path = _buildSingleHopPath(BASE_MAINNET_USDC, TICK_SPACING_100, BASE_MAINNET_TRUST);
+
+        (uint256 amountOut, bool success) = trustSwapRouter.quoteExactInput(path, 0);
+
+        assertEq(amountOut, 0);
+        assertTrue(success, "zero amountIn must report success=true, not be confused with a failure");
+    }
+
+    /// @notice Tripwire: assert the mock hub's `quoteTransferRemote` is amount-independent.
+    /// @dev    `swapAndBridgeWithETH` and `swapAndBridgeWithERC20` quote the bridge fee
+    ///         pre-swap using `minTrustOut` as a representative non-zero amount, because
+    ///         the actual post-swap TRUST output is not yet known. This is sound only
+    ///         because Caldera's metalayer hub returns an amount-independent fee for any
+    ///         non-zero amount. The mock mirrors that contract. If anyone updates the mock
+    ///         to a per-amount fee model (to simulate a Caldera change), this assertion
+    ///         fires as a forcing function to revisit the pre-swap fee-quoting design
+    ///         (e.g. add a post-swap re-quote + refund).
+    function test_metaERC20Hub_quoteTransferRemote_isAmountIndependent() public view {
+        bytes32 anyRecipient = bytes32(uint256(uint160(user)));
+        uint32 domain = trustSwapRouter.recipientDomain();
+
+        uint256 feeAt1Wei = metaERC20Hub.quoteTransferRemote(domain, anyRecipient, 1);
+        uint256 feeAt1eN = metaERC20Hub.quoteTransferRemote(domain, anyRecipient, 1_000_000e18);
+        uint256 feeAtUint128Max = metaERC20Hub.quoteTransferRemote(domain, anyRecipient, type(uint128).max);
+
+        assertEq(feeAt1Wei, feeAt1eN, "bridge fee must be amount-independent (small vs mid amount)");
+        assertEq(feeAt1Wei, feeAtUint128Max, "bridge fee must be amount-independent (small vs huge amount)");
+        assertEq(feeAt1Wei, metaERC20Hub.BRIDGE_FEE(), "bridge fee must match the mock's BRIDGE_FEE constant");
     }
 
     /* =================================================== */
@@ -955,7 +1157,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
-        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(shortPath, 0, user);
+        trustSwapRouter.swapAndBridgeWithETH{ value: 1 ether + bridgeFee }(
+            shortPath, 1, user, block.timestamp + 1 hours
+        );
     }
 
     function test_pathValidation_revertsOnWrongLengthModulo() public {
@@ -974,7 +1178,9 @@ contract TrustSwapAndBridgeRouterTest is Test {
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(ITrustSwapAndBridgeRouter.TrustSwapAndBridgeRouter_InvalidPath.selector));
-        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(BASE_MAINNET_USDC, 100e6, badPath, 0, user);
+        trustSwapRouter.swapAndBridgeWithERC20{ value: bridgeFee }(
+            BASE_MAINNET_USDC, 100e6, badPath, 1, user, block.timestamp + 1 hours
+        );
     }
 
     /* =================================================== */

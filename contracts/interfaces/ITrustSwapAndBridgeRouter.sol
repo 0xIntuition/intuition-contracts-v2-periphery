@@ -68,6 +68,11 @@ interface ITrustSwapAndBridgeRouter {
     /// @dev Thrown when attempting to swap with zero amount
     error TrustSwapAndBridgeRouter_AmountInZero();
 
+    /// @dev Thrown when minTrustOut is zero; the bridge-fee quote assumes a
+    ///      non-zero representative amount, and a zero minimum also disables
+    ///      slippage protection on the swap
+    error TrustSwapAndBridgeRouter_MinTrustOutZero();
+
     /// @dev Thrown when insufficient ETH is provided for bridge fees
     error TrustSwapAndBridgeRouter_InsufficientBridgeFee();
 
@@ -98,6 +103,11 @@ interface ITrustSwapAndBridgeRouter {
     /// @dev Thrown when the ETH refund to the user fails after swap and bridge
     error TrustSwapAndBridgeRouter_ETHRefundFailed();
 
+    /// @dev Thrown when the caller-supplied swap deadline has already passed.
+    ///      Fires at the entry of `swapAndBridgeWithETH` / `swapAndBridgeWithERC20`
+    ///      before any external call.
+    error TrustSwapAndBridgeRouter_DeadlineExpired();
+
     /* =================================================== */
     /*                 SWAP FUNCTIONS                      */
     /* =================================================== */
@@ -105,18 +115,30 @@ interface ITrustSwapAndBridgeRouter {
     /**
      * @notice Swaps ETH for TRUST using a pre-built Slipstream path and bridges to destination chain
      * @dev Wraps ETH to WETH, then calls Slipstream SwapRouter exactInput. Path must start with WETH and end with
-     * TRUST.
-     *      msg.value must include both swap amount and bridge fee.
+     *      TRUST. msg.value must include both swap amount and bridge fee.
+     *
+     *      `deadline` is caller-supplied (not `block.timestamp`) so users get a meaningful expiry against
+     *      mempool-stale execution. The downstream Slipstream router enforces `block.timestamp <= deadline`;
+     *      this contract additionally pre-validates and reverts with `TrustSwapAndBridgeRouter_DeadlineExpired`
+     *      so the failure reason is a clean custom selector at our boundary rather than a generic string from
+     *      Slipstream.
+     *
+     *      Contract integrators: this router refunds any `msg.value` surplus over `bridgeFee` via a push-style
+     *      `msg.sender.call{value: …}("")`. Smart-contract callers that don't accept native (no `receive` /
+     *      `fallback`) will revert with `TrustSwapAndBridgeRouter_ETHRefundFailed`. Sizes the value precisely
+     *      with `quoteBridgeFee`, or use an EOA-routed flow.
      * @param path Packed Slipstream path (token0|tickSpacing|token1|...). Must start with WETH and end with TRUST.
      * @param minTrustOut Minimum acceptable TRUST output (slippage protection, enforced by SwapRouter)
      * @param recipient Recipient address on destination chain
+     * @param deadline Unix timestamp after which the swap reverts. Must be >= `block.timestamp` at execution.
      * @return amountOut Actual TRUST received and bridged
      * @return transferId Cross-chain transfer ID from Metalayer
      */
     function swapAndBridgeWithETH(
         bytes calldata path,
         uint256 minTrustOut,
-        address recipient
+        address recipient,
+        uint256 deadline
     )
         external
         payable
@@ -125,11 +147,14 @@ interface ITrustSwapAndBridgeRouter {
     /**
      * @notice Swaps any ERC20 for TRUST using a pre-built Slipstream path and bridges to destination chain
      * @dev Caller must approve this contract to spend amountIn of tokenIn. msg.value must cover bridge fee.
+     *      See `swapAndBridgeWithETH` for the rationale on caller-supplied `deadline` and on the contract-
+     *      integrator caveat for the native-ETH refund.
      * @param tokenIn Input token address (must match first token in path)
      * @param amountIn Amount of tokenIn to swap
      * @param path Packed Slipstream path (token0|tickSpacing|token1|...). Must start with tokenIn and end with TRUST.
      * @param minTrustOut Minimum acceptable TRUST output (slippage protection, enforced by SwapRouter)
      * @param recipient Recipient address on destination chain
+     * @param deadline Unix timestamp after which the swap reverts. Must be >= `block.timestamp` at execution.
      * @return amountOut Actual TRUST received and bridged
      * @return transferId Cross-chain transfer ID from Metalayer
      */
@@ -138,7 +163,8 @@ interface ITrustSwapAndBridgeRouter {
         uint256 amountIn,
         bytes calldata path,
         uint256 minTrustOut,
-        address recipient
+        address recipient,
+        uint256 deadline
     )
         external
         payable
@@ -147,6 +173,8 @@ interface ITrustSwapAndBridgeRouter {
     /**
      * @notice Bridges TRUST directly to the destination chain without performing a swap
      * @dev Caller must approve this contract to spend trustAmount TRUST. msg.value must cover bridge fee.
+     *      See `swapAndBridgeWithETH` for the contract-integrator caveat on the native-ETH refund — same
+     *      push-style refund applies here for any `msg.value` surplus over `bridgeFee`.
      * @param trustAmount The amount of TRUST to bridge
      * @param recipient Recipient address on the destination chain
      * @return transferId Cross-chain transfer ID from Metalayer
@@ -167,12 +195,20 @@ interface ITrustSwapAndBridgeRouter {
 
     /**
      * @notice Quotes expected output for a given Slipstream path and input amount
-     * @dev Thin wrapper around Slipstream QuoterV2. Returns 0 on failure.
+     * @dev Thin wrapper around Slipstream QuoterV2.
+     *
+     *      Returns an explicit `success` flag so callers can distinguish a legitimate zero-output quote from
+     *      a quoter failure (transient RPC, stale oracle, deprecated pool). Frontends and integrators that
+     *      derive `minTrustOut` from this preflight value **must** branch on `success`: a `false` return must
+     *      abort the swap rather than be treated as a zero quote, otherwise slippage protection collapses
+     *      (a `minTrustOut = 0` makes the downstream swap accept any output amount, opening it to sandwich
+     *      MEV).
      * @param path Packed Slipstream path
      * @param amountIn Input amount for first token in path
-     * @return amountOut Expected output amount
+     * @return amountOut Expected output amount, or 0 if the underlying quoter call reverted
+     * @return success True if the underlying quoter call succeeded, false on any revert
      */
-    function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut);
+    function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut, bool success);
 
     /* =================================================== */
     /*                   VIEW FUNCTIONS                    */

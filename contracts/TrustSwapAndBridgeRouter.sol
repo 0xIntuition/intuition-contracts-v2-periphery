@@ -65,6 +65,10 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
     FinalityState public constant finalityState = FinalityState.INSTANT;
 
     /// @notice Accepts ETH refunds from downstream swap router calls (e.g. refundETH in exactInput).
+    /// @dev    Also the path through which surplus `msg.value` is returned to the caller via
+    ///         `_refundExcess`. Contract integrators that route calls through this router must
+    ///         implement their own `receive()` or `fallback()` to accept the surplus — otherwise
+    ///         the call reverts with `TrustSwapAndBridgeRouter_ETHRefundFailed`.
     receive() external payable { }
 
     /* =================================================== */
@@ -75,14 +79,17 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
     function swapAndBridgeWithETH(
         bytes calldata path,
         uint256 minTrustOut,
-        address recipient
+        address recipient,
+        uint256 deadline
     )
         external
         payable
         nonReentrant
         returns (uint256 amountOut, bytes32 transferId)
     {
+        if (deadline < block.timestamp) revert TrustSwapAndBridgeRouter_DeadlineExpired();
         if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
+        if (minTrustOut == 0) revert TrustSwapAndBridgeRouter_MinTrustOutZero();
         if (_extractTokenAtOffset(path, 0) != WETH_ADDRESS) {
             revert TrustSwapAndBridgeRouter_PathDoesNotStartWithWETH();
         }
@@ -94,6 +101,13 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
 
         bytes32 recipientAddress = _formatRecipientAddress(recipient);
 
+        // @dev Fee-quoting assumption:
+        //      The bridge fee must be known *before* the swap so we can decide how much ETH
+        //      to swap (`msg.value - bridgeFee`). But the true post-swap TRUST output isn't
+        //      known until after the swap, so we quote with `minTrustOut` as a representative
+        //      non-zero amount instead of the eventual `amountOut`. This is sound only
+        //      because Caldera's Metalayer hub documents that `quoteTransferRemote` returns
+        //      an amount-independent fee for any non-zero amount.
         uint256 bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, minTrustOut);
         if (msg.value <= bridgeFee) {
             revert TrustSwapAndBridgeRouter_InsufficientETH();
@@ -110,7 +124,7 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
                 ISlipstreamSwapRouter.ExactInputParams({
                     path: path,
                     recipient: address(this),
-                    deadline: block.timestamp,
+                    deadline: deadline,
                     amountIn: swapEth,
                     amountOutMinimum: minTrustOut
                 })
@@ -127,15 +141,18 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
         uint256 amountIn,
         bytes calldata path,
         uint256 minTrustOut,
-        address recipient
+        address recipient,
+        uint256 deadline
     )
         external
         payable
         nonReentrant
         returns (uint256 amountOut, bytes32 transferId)
     {
+        if (deadline < block.timestamp) revert TrustSwapAndBridgeRouter_DeadlineExpired();
         if (amountIn == 0) revert TrustSwapAndBridgeRouter_AmountInZero();
         if (recipient == address(0)) revert TrustSwapAndBridgeRouter_InvalidRecipient();
+        if (minTrustOut == 0) revert TrustSwapAndBridgeRouter_MinTrustOutZero();
         if (tokenIn == address(0) || tokenIn == TRUST_ADDRESS) {
             revert TrustSwapAndBridgeRouter_InvalidToken();
         }
@@ -152,6 +169,9 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
 
         bytes32 recipientAddress = _formatRecipientAddress(recipient);
 
+        // @dev See `swapAndBridgeWithETH` for the fee-quoting assumption (the bridge fee
+        //      is assumed amount-independent for any non-zero amount, so we quote with
+        //      `minTrustOut` pre-swap rather than the unknown post-swap `amountOut`).
         uint256 bridgeFee = metaERC20Hub.quoteTransferRemote(recipientDomain, recipientAddress, minTrustOut);
         if (msg.value < bridgeFee) {
             revert TrustSwapAndBridgeRouter_InsufficientBridgeFee();
@@ -164,7 +184,7 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
                 ISlipstreamSwapRouter.ExactInputParams({
                     path: path,
                     recipient: address(this),
-                    deadline: block.timestamp,
+                    deadline: deadline,
                     amountIn: amountIn,
                     amountOutMinimum: minTrustOut
                 })
@@ -215,13 +235,15 @@ contract TrustSwapAndBridgeRouter is ITrustSwapAndBridgeRouter, ReentrancyGuard 
     }
 
     /// @inheritdoc ITrustSwapAndBridgeRouter
-    function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut) {
+    function quoteExactInput(bytes calldata path, uint256 amountIn) external returns (uint256 amountOut, bool success) {
         try ICLQuoter(slipstreamQuoter).quoteExactInput(path, amountIn) returns (
             uint256 quotedAmountOut, uint160[] memory, uint32[] memory, uint256
         ) {
             amountOut = quotedAmountOut;
+            success = true;
         } catch {
             amountOut = 0;
+            success = false;
         }
     }
 
