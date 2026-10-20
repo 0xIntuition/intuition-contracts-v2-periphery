@@ -1,5 +1,38 @@
 # Intuition V2 Periphery Smart Contracts
 
+## npm alpha package
+
+This branch prepares `@0xintuition/contracts-v2-periphery@1.1.0-alpha.0` for the `alpha` tag. It ships the
+TrustSwapAndBridgeRouter Solidity source and required interfaces, ABI and creation bytecode, ESM/CommonJS exports,
+TypeScript declarations, and `artifact-manifest.json`. Other periphery contracts remain repository-only in this release.
+No Solidity business logic is changed by the packaging work.
+
+After publication:
+
+```ts
+import { TrustSwapAndBridgeRouterAbi } from "@0xintuition/contracts-v2-periphery/abis";
+import { TrustSwapAndBridgeRouterBytecode } from "@0xintuition/contracts-v2-periphery/bytecodes";
+```
+
+Foundry source consumers need these remappings:
+
+```text
+@0xintuition/contracts-v2-periphery/=node_modules/@0xintuition/contracts-v2-periphery/
+node_modules/@0xintuition/contracts-v2-periphery/:contracts/=node_modules/@0xintuition/contracts-v2-periphery/contracts/
+@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
+```
+
+Run `bun install --frozen-lockfile`, `bun run release:check`, and `bun run test:router`. Release checks build and test
+the package, install its tarball in an isolated JS/TS consumer, and reproduce the Solidity ABI/bytecode using only npm
+dependencies. `npm pack` and `npm publish` run these checks through `prepack`. With a permitted npm login and an unused
+version, publish using `npm publish --access public --tag alpha`; leave `latest` unchanged. This publishes artifacts
+only and does not deploy contracts. Check the registry integrity and record the final git revision after publication.
+
+The package build uses the pinned OpenZeppelin v5.4.0 submodule; consumers install the matching exact npm version. The
+legacy core submodule's v4 dependencies remain development-only aliases for repository tests. The router is pinned to
+Base mainnet protocol addresses; publishing its bytecode does not establish compatibility with other chains or deployed
+revisions.
+
 A set of periphery smart contracts for the Intuition protocol, built using [Foundry](https://book.getfoundry.sh/).
 
 ## What's Inside
@@ -99,7 +132,6 @@ $ bun run test:coverage:report
 > This command requires you to have [`lcov`](https://github.com/linux-test-project/lcov) installed on your machine. On
 > macOS, you can install it with Homebrew: `brew install lcov`.
 
-
 ## Claude Slash Commands (Shared)
 
 This repo includes team-shared Claude slash commands in `.claude/commands`.
@@ -115,11 +147,9 @@ Use `/help` in Claude Code to see them, then run:
 
 Generated reports are written to `audits/automated-reports/`.
 
-
 ## License
 
 This project is licensed under BUSL-1.1
-
 
 # Deployed Contracts
 
@@ -127,30 +157,30 @@ This project is licensed under BUSL-1.1
 
 ### Base Mainnet
 
-| Contract Name               | Address                                    | ProxyAdmin                                 |
-|-----------------------------|--------------------------------------------|--------------------------------------------|
-| EmissionsAutomationAdapter  | 0xb1ce9Ac324B5C3928736Ec33b5Fd741cb04a2F2d | /                                          |
-| TrustSwapAndBridgeRouter    | 0xA1EC6f95A88Bfc7A8Fd35f1296b64ebaf91C93fb | /                                          |
+| Contract Name              | Address                                    | ProxyAdmin |
+| -------------------------- | ------------------------------------------ | ---------- |
+| EmissionsAutomationAdapter | 0xb1ce9Ac324B5C3928736Ec33b5Fd741cb04a2F2d | /          |
+| TrustSwapAndBridgeRouter   | 0xA1EC6f95A88Bfc7A8Fd35f1296b64ebaf91C93fb | /          |
 
 ### Intuition Mainnet
 
-| Contract Name                 | Address                                    | ProxyAdmin                                  |
-|-------------------------------|--------------------------------------------|---------------------------------------------|
-| Multicall3                    | 0xcA11bde05977b3631167028862bE2a173976CA11 | /                                           |
-| EntryPoint                    | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /                                           |
-| SafeSingletonFactory          | 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 | /                                           |
+| Contract Name        | Address                                    | ProxyAdmin |
+| -------------------- | ------------------------------------------ | ---------- |
+| Multicall3           | 0xcA11bde05977b3631167028862bE2a173976CA11 | /          |
+| EntryPoint           | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /          |
+| SafeSingletonFactory | 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 | /          |
 
 ## Testnet
 
 ### Base Sepolia
 
-| Contract Name               | Address                                    | ProxyAdmin                                 |
-|-----------------------------|--------------------------------------------|--------------------------------------------|
-| TestTrust                   | 0xA54b4E6e356b963Ee00d1C947f478d9194a1a210 | /                                          |
+| Contract Name | Address                                    | ProxyAdmin |
+| ------------- | ------------------------------------------ | ---------- |
+| TestTrust     | 0xA54b4E6e356b963Ee00d1C947f478d9194a1a210 | /          |
 
 ### Intuition Testnet
 
-| Contract Name                 | Address                                    | ProxyAdmin                                  |
-|-------------------------------|--------------------------------------------|---------------------------------------------|
-| Multicall3                    | 0xcA11bde05977b3631167028862bE2a173976CA11 | /                                           |
-| EntryPoint                    | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /                                           |
+| Contract Name | Address                                    | ProxyAdmin |
+| ------------- | ------------------------------------------ | ---------- |
+| Multicall3    | 0xcA11bde05977b3631167028862bE2a173976CA11 | /          |
+| EntryPoint    | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /          |
