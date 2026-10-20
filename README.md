@@ -168,9 +168,6 @@ This project is licensed under BUSL-1.1
 
 | Contract Name           | Address                                    | ProxyAdmin                                 |
 | ----------------------- | ------------------------------------------ | ------------------------------------------ |
-| Multicall3              | 0xcA11bde05977b3631167028862bE2a173976CA11 | /                                          |
-| EntryPoint              | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /                                          |
-| SafeSingletonFactory    | 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 | /                                          |
 | MetaNativeSpoke (TRUST) | 0x375135fe908dD62f3C7939FA4e65bf41Da721AB9 | 0xe433e1e8Fb2dBD028900BC8b073Fd4392d3b3A63 |
 | MetaERC20Spoke (USDC)   | 0x7e41962bE9B2640e653BfA8c8713A905659FE157 | 0x6635a40EA4DdB5aa0Cc720A6883E934f4385AA23 |
 | MetaERC20Spoke (WETH)   | 0xFB4BAa05BF339AD6074047176F90757A6C87f944 | 0x42d2100553eB21e1CB79864C0BCbFA3C963957c7 |
@@ -178,17 +175,6 @@ This project is licensed under BUSL-1.1
 The Metalayer hubs on Base and spokes on Intuition bridge TRUST, USDC and WETH between the two chains. TRUST arrives on
 Intuition as the native token through MetaNativeSpoke; the USDC and WETH hubs share an address with their spokes.
 
-## Testnet
-
-### Base Sepolia
-
-| Contract Name | Address                                    | ProxyAdmin |
-| ------------- | ------------------------------------------ | ---------- |
-| TestTrust     | 0xA54b4E6e356b963Ee00d1C947f478d9194a1a210 | /          |
-
-### Intuition Testnet
-
-| Contract Name | Address                                    | ProxyAdmin |
-| ------------- | ------------------------------------------ | ---------- |
-| Multicall3    | 0xcA11bde05977b3631167028862bE2a173976CA11 | /          |
-| EntryPoint    | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /          |
+There are no periphery deployments on testnet. The core contracts, including Multicall3, EntryPoint and
+SafeSingletonFactory, are listed in the
+[intuition-contracts-v2 README](https://github.com/0xIntuition/intuition-contracts-v2#deployed-contracts).
