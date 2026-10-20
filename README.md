@@ -157,18 +157,26 @@ This project is licensed under BUSL-1.1
 
 ### Base Mainnet
 
-| Contract Name              | Address                                    | ProxyAdmin |
-| -------------------------- | ------------------------------------------ | ---------- |
-| EmissionsAutomationAdapter | 0xb1ce9Ac324B5C3928736Ec33b5Fd741cb04a2F2d | /          |
-| TrustSwapAndBridgeRouter   | 0xA1EC6f95A88Bfc7A8Fd35f1296b64ebaf91C93fb | /          |
+| Contract Name              | Address                                    | ProxyAdmin                                 |
+| -------------------------- | ------------------------------------------ | ------------------------------------------ |
+| EmissionsAutomationAdapter | 0xb1ce9Ac324B5C3928736Ec33b5Fd741cb04a2F2d | /                                          |
+| MetaERC20Hub (TRUST)       | 0xE12aaF1529Ae21899029a9b51cca2F2Bc2cfC421 | 0x2A627d89f08b9c23c8CF1dff0C475B9Ea7eDF696 |
+| MetaERC20Hub (USDC)        | 0x7e41962bE9B2640e653BfA8c8713A905659FE157 | 0x6635a40EA4DdB5aa0Cc720A6883E934f4385AA23 |
+| MetaERC20Hub (WETH)        | 0xFB4BAa05BF339AD6074047176F90757A6C87f944 | 0x42d2100553eB21e1CB79864C0BCbFA3C963957c7 |
 
 ### Intuition Mainnet
 
-| Contract Name        | Address                                    | ProxyAdmin |
-| -------------------- | ------------------------------------------ | ---------- |
-| Multicall3           | 0xcA11bde05977b3631167028862bE2a173976CA11 | /          |
-| EntryPoint           | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /          |
-| SafeSingletonFactory | 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 | /          |
+| Contract Name           | Address                                    | ProxyAdmin                                 |
+| ----------------------- | ------------------------------------------ | ------------------------------------------ |
+| Multicall3              | 0xcA11bde05977b3631167028862bE2a173976CA11 | /                                          |
+| EntryPoint              | 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108 | /                                          |
+| SafeSingletonFactory    | 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 | /                                          |
+| MetaNativeSpoke (TRUST) | 0x375135fe908dD62f3C7939FA4e65bf41Da721AB9 | 0xe433e1e8Fb2dBD028900BC8b073Fd4392d3b3A63 |
+| MetaERC20Spoke (USDC)   | 0x7e41962bE9B2640e653BfA8c8713A905659FE157 | 0x6635a40EA4DdB5aa0Cc720A6883E934f4385AA23 |
+| MetaERC20Spoke (WETH)   | 0xFB4BAa05BF339AD6074047176F90757A6C87f944 | 0x42d2100553eB21e1CB79864C0BCbFA3C963957c7 |
+
+The Metalayer hubs on Base and spokes on Intuition bridge TRUST, USDC and WETH between the two chains. TRUST arrives on
+Intuition as the native token through MetaNativeSpoke; the USDC and WETH hubs share an address with their spokes.
 
 ## Testnet
 
