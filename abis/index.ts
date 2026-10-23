@@ -1,0 +1,1 @@
+export { TrustSwapAndBridgeRouterAbi } from './TrustSwapAndBridgeRouter';

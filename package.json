@@ -1,26 +1,29 @@
 {
-  "name": "intuition-contracts-v2-periphery",
+  "name": "@0xintuition/contracts-v2-periphery",
   "description": "Intuition V2 Periphery Smart Contracts",
-  "version": "1.0.0",
+  "version": "1.1.0-alpha.0",
   "author": {
     "name": "0xIntuition",
-    "url": "https://github.com/0xIntuition/intuition-contracts-v2"
+    "url": "https://github.com/0xIntuition/intuition-contracts-v2-periphery"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.6",
-    "@openzeppelin/contracts-upgradeable": "^4.9.6"
+    "@openzeppelin/contracts": "5.4.0"
   },
   "devDependencies": {
     "@types/node": "^24.7.0",
     "ethers": "^5.8.0",
     "prettier": "^3.5",
-    "solhint": "^5.1"
+    "solhint": "^5.1",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "@openzeppelin-v4/contracts": "npm:@openzeppelin/contracts@4.9.6",
+    "@openzeppelin-v4/contracts-upgradeable": "npm:@openzeppelin/contracts-upgradeable@4.9.6"
   },
   "keywords": [
     "intuition",
     "ethereum"
   ],
-  "private": true,
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
@@ -33,6 +36,74 @@
     "test": "forge test",
     "coverage": "forge coverage --no-match-coverage '(script|tests|src/external)'",
     "test:coverage": "forge coverage",
-    "test:coverage:report": "forge coverage --no-match-coverage '(script|tests|src/external)' --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent"
+    "test:coverage:report": "forge coverage --no-match-coverage '(script|tests|src/external)' --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent",
+    "build:router": "forge build contracts/TrustSwapAndBridgeRouter.sol",
+    "extract": "tsx extract-abis.ts && tsx extract-bytecodes.ts",
+    "build:ts": "tsup",
+    "build:package": "bun run build:router && bun run extract && bun run build:ts",
+    "prepack": "bun run release:check",
+    "test:package": "bun test scripts/package.test.ts",
+    "test:router": "forge test --match-path tests/TrustSwapAndBridgeRouter/TrustSwapAndBridgeRouter.t.sol",
+    "release:alpha": "npm publish --access public --tag alpha",
+    "test:packed": "node scripts/test-packed.mjs",
+    "release:check": "bun run build:package && tsc --noEmit && bun run test:package && bun run test:packed"
+  },
+  "license": "BUSL-1.1",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xIntuition/intuition-contracts-v2-periphery.git"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./abis": {
+      "import": {
+        "types": "./dist/abis/index.d.ts",
+        "default": "./dist/abis/index.js"
+      },
+      "require": {
+        "types": "./dist/abis/index.d.cts",
+        "default": "./dist/abis/index.cjs"
+      }
+    },
+    "./bytecodes": {
+      "import": {
+        "types": "./dist/bytecodes/index.d.ts",
+        "default": "./dist/bytecodes/index.js"
+      },
+      "require": {
+        "types": "./dist/bytecodes/index.d.cts",
+        "default": "./dist/bytecodes/index.cjs"
+      }
+    },
+    "./package.json": "./package.json",
+    "./artifact-manifest.json": "./artifact-manifest.json",
+    "./contracts/*": "./contracts/*"
+  },
+  "files": [
+    "dist",
+    "artifact-manifest.json",
+    "contracts/TrustSwapAndBridgeRouter.sol",
+    "contracts/interfaces/ITrustSwapAndBridgeRouter.sol",
+    "contracts/interfaces/external/aerodrome",
+    "contracts/interfaces/external/metalayer/IMetaERC20Hub.sol",
+    "contracts/interfaces/external/IWETH.sol"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
   }
 }

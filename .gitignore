@@ -24,3 +24,7 @@ broadcast/*/31337/
 # Claude Code personal settings
 .claude/settings.local.json
 CLAUDE.md
+
+# npm package build outputs
+dist/
+*.tgz
